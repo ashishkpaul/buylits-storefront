@@ -7,7 +7,8 @@ let GRAPHQL_API = import.meta.env.IS_DEV
 		? LOCAL_API
 		: PROD_API;
 
-GRAPHQL_API = `${GRAPHQL_API}/shop-api`;
+// Use the Vendure custom shop API path
+GRAPHQL_API = `${GRAPHQL_API}/shop-api-Di0eokoxeob9`;
 
 const config: CodegenConfig = {
 	schema: [

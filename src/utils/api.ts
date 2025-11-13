@@ -11,7 +11,8 @@ type ExecuteProps<V> = { query: string; variables?: V };
 type Options = { method: string; headers: Record<string, string>; body: string };
 
 const baseUrl = import.meta.env.DEV ? DEV_API : PROD_API;
-const shopApi = `${baseUrl}/shop-api`;
+// Use Vendure custom shop API path
+const shopApi = `${baseUrl}/shop-api-Di0eokoxeob9`;
 
 export const requester = async <R, V>(
 	doc: DocumentNode,
