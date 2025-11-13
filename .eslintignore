@@ -29,3 +29,4 @@ dist
 tsconfig.tsbuildinfo
 vite.config.ts
 src/generated
+server

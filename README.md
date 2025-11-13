@@ -71,7 +71,7 @@ pnpm start
 The preview command will create a production build of the client modules, a production build of `src/entry.preview.tsx`, and run a local server. The preview server is only for convenience to locally preview a production build, and it should not be used as a production server.
 
 ```shell
-pnpm preview # or `yarn preview`
+pnpm preview # or `pnpm preview`
 ```
 
 ## Production
@@ -79,7 +79,7 @@ pnpm preview # or `yarn preview`
 The production build will generate client and server modules by running both client and server build commands. Additionally, the build command will use Typescript to run a type check on the source code.
 
 ```shell
-pnpm build # or `yarn build`
+pnpm build # or `pnpm build`
 ```
 
 ### i18n
@@ -223,3 +223,13 @@ Security notes
 - Only enable HSTS after verifying HTTPS works for all subdomains.
 
 If you'd like, I can create the systemd unit and nginx config tailored to your domain and path, or prepare a Docker Compose / Traefik example. Tell me which approach you prefer and your domain.
+
+## Express Server
+
+This app has a minimal [Express server](https://expressjs.com/) implementation. After running a full build, you can preview the build using the command:
+
+```text
+pnpm serve
+```
+
+Then visit [http://localhost:8080/](http://localhost:8080/)
