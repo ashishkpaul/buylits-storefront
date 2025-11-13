@@ -30,6 +30,11 @@ export type Scalars = {
 
 export type ActiveOrderResult = NoActiveOrderError | Order;
 
+export type AddItemInput = {
+	productVariantId: Scalars['ID']['input'];
+	quantity: Scalars['Int']['input'];
+};
+
 export type AddPaymentToOrderResult =
 	| IneligiblePaymentMethodError
 	| NoActiveOrderError
@@ -134,6 +139,8 @@ export type AuthenticationResult = CurrentUser | InvalidCredentialsError | NotVe
 
 export type BooleanCustomFieldConfig = CustomField & {
 	__typename?: 'BooleanCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
 	label?: Maybe<Array<LocalizedString>>;
@@ -421,6 +428,18 @@ export type CreateCustomerInput = {
 	lastName: Scalars['String']['input'];
 	phoneNumber?: InputMaybe<Scalars['String']['input']>;
 	title?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type CreateSellerCustomFieldsInput = {
+	sellerPostalCode?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type CreateSellerInput = {
+	customFields?: InputMaybe<CreateSellerCustomFieldsInput>;
+	emailAddress: Scalars['String']['input'];
+	firstName: Scalars['String']['input'];
+	lastName: Scalars['String']['input'];
+	password: Scalars['String']['input'];
 };
 
 /**
@@ -763,6 +782,8 @@ export type CurrentUserChannel = {
 };
 
 export type CustomField = {
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
 	label?: Maybe<Array<LocalizedString>>;
@@ -786,6 +807,22 @@ export type CustomFieldConfig =
 	| StringCustomFieldConfig
 	| StructCustomFieldConfig
 	| TextCustomFieldConfig;
+
+export type CustomMappings = CustomProductMappings | CustomProductVariantMappings;
+
+export type CustomProductMappings = {
+	__typename?: 'CustomProductMappings';
+	sellerNames?: Maybe<Array<Scalars['String']['output']>>;
+	sellerPostalCodes?: Maybe<Array<Scalars['String']['output']>>;
+};
+
+export type CustomProductVariantMappings = {
+	__typename?: 'CustomProductVariantMappings';
+	releaseDate?: Maybe<Scalars['String']['output']>;
+	sellerName?: Maybe<Scalars['String']['output']>;
+	sellerPostalCode?: Maybe<Scalars['String']['output']>;
+	variantMRP?: Maybe<Scalars['Int']['output']>;
+};
 
 export type Customer = Node & {
 	__typename?: 'Customer';
@@ -889,6 +926,8 @@ export type DateRange = {
  */
 export type DateTimeCustomFieldConfig = CustomField & {
 	__typename?: 'DateTimeCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
 	label?: Maybe<Array<LocalizedString>>;
@@ -1145,6 +1184,8 @@ export type FacetValueTranslation = {
 
 export type FloatCustomFieldConfig = CustomField & {
 	__typename?: 'FloatCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
 	label?: Maybe<Array<LocalizedString>>;
@@ -1344,6 +1385,8 @@ export type InsufficientStockError = ErrorResult & {
 
 export type IntCustomFieldConfig = CustomField & {
 	__typename?: 'IntCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
 	label?: Maybe<Array<LocalizedString>>;
@@ -1709,6 +1752,8 @@ export const LanguageCode = {
 export type LanguageCode = (typeof LanguageCode)[keyof typeof LanguageCode];
 export type LocaleStringCustomFieldConfig = CustomField & {
 	__typename?: 'LocaleStringCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
 	label?: Maybe<Array<LocalizedString>>;
@@ -1725,6 +1770,8 @@ export type LocaleStringCustomFieldConfig = CustomField & {
 
 export type LocaleTextCustomFieldConfig = CustomField & {
 	__typename?: 'LocaleTextCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
 	label?: Maybe<Array<LocalizedString>>;
@@ -1760,6 +1807,8 @@ export type Mutation = {
 	__typename?: 'Mutation';
 	/** Adds an item to the Order. If custom fields are defined on the OrderLine entity, a third argument 'customFields' will be available. */
 	addItemToOrder: UpdateOrderItemsResult;
+	/** Adds mutliple items to the Order. Returns a list of errors for each item that failed to add. It will still add successful items. */
+	addItemsToOrder: UpdateMultipleOrderItemsResult;
 	/** Add a Payment to the Order */
 	addPaymentToOrder: AddPaymentToOrderResult;
 	/** Adjusts an OrderLine. If custom fields are defined on the OrderLine entity, a third argument 'customFields' of type `OrderLineCustomFieldsInput` will be available. */
@@ -1801,6 +1850,7 @@ export type Mutation = {
 	 * 3. The Customer _must_ be registered _with_ a password. No further action is needed - the Customer is able to authenticate immediately.
 	 */
 	registerCustomerAccount: RegisterCustomerAccountResult;
+	registerNewSeller?: Maybe<Channel>;
 	/** Remove all OrderLine from the Order */
 	removeAllOrderLines: RemoveOrderItemsResult;
 	/** Removes the given coupon code from the active Order */
@@ -1833,6 +1883,11 @@ export type Mutation = {
 	 * shipping method will apply to.
 	 */
 	setOrderShippingMethod: SetOrderShippingMethodResult;
+	/**
+	 * Track a search term usage for analytics.
+	 * Call this when a user performs a search to build popular search terms.
+	 */
+	trackSearchTerm: Scalars['Boolean']['output'];
 	/** Transitions an Order to a new state. Valid next states can be found by querying `nextOrderStates` */
 	transitionOrderToState?: Maybe<TransitionOrderToStateResult>;
 	/** Unsets the billing address for the active Order. Available since version 3.1.0 */
@@ -1862,6 +1917,10 @@ export type Mutation = {
 export type MutationAddItemToOrderArgs = {
 	productVariantId: Scalars['ID']['input'];
 	quantity: Scalars['Int']['input'];
+};
+
+export type MutationAddItemsToOrderArgs = {
+	inputs: Array<AddItemInput>;
 };
 
 export type MutationAddPaymentToOrderArgs = {
@@ -1904,6 +1963,10 @@ export type MutationRegisterCustomerAccountArgs = {
 	input: RegisterCustomerInput;
 };
 
+export type MutationRegisterNewSellerArgs = {
+	input: RegisterSellerInput;
+};
+
 export type MutationRemoveCouponCodeArgs = {
 	couponCode: Scalars['String']['input'];
 };
@@ -1944,6 +2007,10 @@ export type MutationSetOrderShippingAddressArgs = {
 
 export type MutationSetOrderShippingMethodArgs = {
 	shippingMethodId: Array<Scalars['ID']['input']>;
+};
+
+export type MutationTrackSearchTermArgs = {
+	input: TrackSearchTermInput;
 };
 
 export type MutationTransitionOrderToStateArgs = {
@@ -2643,11 +2710,32 @@ export const Permission = {
 } as const;
 
 export type Permission = (typeof Permission)[keyof typeof Permission];
+export type PopularSearchTerm = {
+	__typename?: 'PopularSearchTerm';
+	/** Number of times this term has been searched */
+	count: Scalars['Int']['output'];
+	/** Last time this term was searched */
+	lastSearched: Scalars['String']['output'];
+	/** The search term */
+	term: Scalars['String']['output'];
+};
+
 /** The price range where the result has more than one price */
 export type PriceRange = {
 	__typename?: 'PriceRange';
 	max: Scalars['Money']['output'];
 	min: Scalars['Money']['output'];
+};
+
+export type PriceRangeBucket = {
+	__typename?: 'PriceRangeBucket';
+	count: Scalars['Int']['output'];
+	to: Scalars['Int']['output'];
+};
+
+export type PriceRangeInput = {
+	max: Scalars['Int']['input'];
+	min: Scalars['Int']['input'];
 };
 
 export type Product = Node & {
@@ -2664,6 +2752,7 @@ export type Product = Node & {
 	languageCode: LanguageCode;
 	name: Scalars['String']['output'];
 	optionGroups: Array<ProductOptionGroup>;
+	productSellerInfo?: Maybe<Seller>;
 	slug: Scalars['String']['output'];
 	translations: Array<ProductTranslation>;
 	updatedAt: Scalars['DateTime']['output'];
@@ -2779,7 +2868,7 @@ export type ProductVariant = Node & {
 	assets: Array<Asset>;
 	createdAt: Scalars['DateTime']['output'];
 	currencyCode: CurrencyCode;
-	customFields?: Maybe<Scalars['JSON']['output']>;
+	customFields?: Maybe<ProductVariantCustomFields>;
 	facetValues: Array<FacetValue>;
 	featuredAsset?: Maybe<Asset>;
 	id: Scalars['ID']['output'];
@@ -2798,6 +2887,12 @@ export type ProductVariant = Node & {
 	updatedAt: Scalars['DateTime']['output'];
 };
 
+export type ProductVariantCustomFields = {
+	__typename?: 'ProductVariantCustomFields';
+	releaseDate?: Maybe<Scalars['DateTime']['output']>;
+	variantMRP?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ProductVariantFilterParameter = {
 	_and?: InputMaybe<Array<ProductVariantFilterParameter>>;
 	_or?: InputMaybe<Array<ProductVariantFilterParameter>>;
@@ -2809,9 +2904,11 @@ export type ProductVariantFilterParameter = {
 	price?: InputMaybe<NumberOperators>;
 	priceWithTax?: InputMaybe<NumberOperators>;
 	productId?: InputMaybe<IdOperators>;
+	releaseDate?: InputMaybe<DateOperators>;
 	sku?: InputMaybe<StringOperators>;
 	stockLevel?: InputMaybe<StringOperators>;
 	updatedAt?: InputMaybe<DateOperators>;
+	variantMRP?: InputMaybe<NumberOperators>;
 };
 
 export type ProductVariantList = PaginatedList & {
@@ -2840,9 +2937,11 @@ export type ProductVariantSortParameter = {
 	price?: InputMaybe<SortOrder>;
 	priceWithTax?: InputMaybe<SortOrder>;
 	productId?: InputMaybe<SortOrder>;
+	releaseDate?: InputMaybe<SortOrder>;
 	sku?: InputMaybe<SortOrder>;
 	stockLevel?: InputMaybe<SortOrder>;
 	updatedAt?: InputMaybe<SortOrder>;
+	variantMRP?: InputMaybe<SortOrder>;
 };
 
 export type ProductVariantTranslation = {
@@ -2912,6 +3011,26 @@ export type ProvinceList = PaginatedList & {
 	totalItems: Scalars['Int']['output'];
 };
 
+export type PublicPaymentMethod = {
+	__typename?: 'PublicPaymentMethod';
+	code: Scalars['String']['output'];
+	customFields?: Maybe<Scalars['JSON']['output']>;
+	description?: Maybe<Scalars['String']['output']>;
+	id: Scalars['ID']['output'];
+	name: Scalars['String']['output'];
+	translations: Array<PaymentMethodTranslation>;
+};
+
+export type PublicShippingMethod = {
+	__typename?: 'PublicShippingMethod';
+	code: Scalars['String']['output'];
+	customFields?: Maybe<Scalars['JSON']['output']>;
+	description?: Maybe<Scalars['String']['output']>;
+	id: Scalars['ID']['output'];
+	name: Scalars['String']['output'];
+	translations: Array<ShippingMethodTranslation>;
+};
+
 export type Query = {
 	__typename?: 'Query';
 	/** The active Channel */
@@ -2924,6 +3043,10 @@ export type Query = {
 	 * query will once again return `null`.
 	 */
 	activeOrder?: Maybe<Order>;
+	/** Get active payment methods */
+	activePaymentMethods: Array<Maybe<PublicPaymentMethod>>;
+	/** Get active shipping methods */
+	activeShippingMethods: Array<Maybe<PublicShippingMethod>>;
 	/** An array of supported Countries */
 	availableCountries: Array<Country>;
 	/** Returns a Collection either by its id or slug. If neither 'id' nor 'slug' is specified, an error will result. */
@@ -2955,12 +3078,22 @@ export type Query = {
 	 * general anonymous access to Order data.
 	 */
 	orderByCode?: Maybe<Order>;
+	/**
+	 * Get popular search terms for the current channel.
+	 * Useful for displaying trending searches.
+	 */
+	popularSearchTerms: Array<PopularSearchTerm>;
 	/** Get a Product either by id or slug. If neither 'id' nor 'slug' is specified, an error will result. */
 	product?: Maybe<Product>;
 	/** Get a list of Products */
 	products: ProductList;
 	/** Search Products based on the criteria set by the `SearchInput` */
 	search: SearchResponse;
+	/**
+	 * Get search suggestions based on partial input.
+	 * Provides autocomplete/typeahead functionality for the storefront.
+	 */
+	searchSuggestions: SearchSuggestionsResponse;
 };
 
 export type QueryCollectionArgs = {
@@ -2993,6 +3126,10 @@ export type QueryOrderByCodeArgs = {
 	code: Scalars['String']['input'];
 };
 
+export type QueryPopularSearchTermsArgs = {
+	limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type QueryProductArgs = {
 	id?: InputMaybe<Scalars['ID']['input']>;
 	slug?: InputMaybe<Scalars['String']['input']>;
@@ -3004,6 +3141,10 @@ export type QueryProductsArgs = {
 
 export type QuerySearchArgs = {
 	input: SearchInput;
+};
+
+export type QuerySearchSuggestionsArgs = {
+	input: SearchSuggestionsInput;
 };
 
 export type RefreshCustomerVerificationResult = NativeAuthStrategyError | Success;
@@ -3074,8 +3215,15 @@ export type RegisterCustomerInput = {
 	title?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type RegisterSellerInput = {
+	seller: CreateSellerInput;
+	shopName: Scalars['String']['input'];
+};
+
 export type RelationCustomFieldConfig = CustomField & {
 	__typename?: 'RelationCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	entity: Scalars['String']['output'];
 	internal?: Maybe<Scalars['Boolean']['output']>;
@@ -3130,7 +3278,11 @@ export type SearchInput = {
 	collectionSlug?: InputMaybe<Scalars['String']['input']>;
 	facetValueFilters?: InputMaybe<Array<FacetValueFilterInput>>;
 	groupByProduct?: InputMaybe<Scalars['Boolean']['input']>;
+	groupBySKU?: InputMaybe<Scalars['Boolean']['input']>;
 	inStock?: InputMaybe<Scalars['Boolean']['input']>;
+	priceRange?: InputMaybe<PriceRangeInput>;
+	priceRangeWithTax?: InputMaybe<PriceRangeInput>;
+	sellerPostalCode?: InputMaybe<Scalars['String']['input']>;
 	skip?: InputMaybe<Scalars['Int']['input']>;
 	sort?: InputMaybe<SearchResultSortParameter>;
 	take?: InputMaybe<Scalars['Int']['input']>;
@@ -3147,7 +3299,16 @@ export type SearchResponse = {
 	collections: Array<CollectionResult>;
 	facetValues: Array<FacetValueResult>;
 	items: Array<SearchResult>;
+	prices: SearchResponsePriceData;
 	totalItems: Scalars['Int']['output'];
+};
+
+export type SearchResponsePriceData = {
+	__typename?: 'SearchResponsePriceData';
+	buckets: Array<PriceRangeBucket>;
+	bucketsWithTax: Array<PriceRangeBucket>;
+	range: PriceRange;
+	rangeWithTax: PriceRange;
 };
 
 export type SearchResult = {
@@ -3155,10 +3316,14 @@ export type SearchResult = {
 	/** An array of ids of the Collections in which this result appears */
 	collectionIds: Array<Scalars['ID']['output']>;
 	currencyCode: CurrencyCode;
+	/** @deprecated Use customProductMappings or customProductVariantMappings */
+	customMappings: CustomMappings;
+	customProductMappings: CustomProductMappings;
+	customProductVariantMappings: CustomProductVariantMappings;
 	description: Scalars['String']['output'];
 	facetIds: Array<Scalars['ID']['output']>;
 	facetValueIds: Array<Scalars['ID']['output']>;
-	inStock: Scalars['Boolean']['output'];
+	inStock?: Maybe<Scalars['Boolean']['output']>;
 	price: SearchResultPrice;
 	priceWithTax: SearchResultPrice;
 	productAsset?: Maybe<SearchResultAsset>;
@@ -3188,13 +3353,64 @@ export type SearchResultSortParameter = {
 	price?: InputMaybe<SortOrder>;
 };
 
+export type SearchSuggestion = {
+	__typename?: 'SearchSuggestion';
+	brandName?: Maybe<Scalars['String']['output']>;
+	categoryId?: Maybe<Scalars['ID']['output']>;
+	categoryName?: Maybe<Scalars['String']['output']>;
+	/** Highlighted text with matched terms wrapped in HTML tags */
+	highlighted: Scalars['String']['output'];
+	inStock?: Maybe<Scalars['Boolean']['output']>;
+	price?: Maybe<Scalars['Int']['output']>;
+	productCount?: Maybe<Scalars['Int']['output']>;
+	/** Additional metadata for the suggestion */
+	productId?: Maybe<Scalars['ID']['output']>;
+	productName?: Maybe<Scalars['String']['output']>;
+	/** Relevance score (0.0 to 1.0) */
+	score: Scalars['Float']['output'];
+	/** The suggestion text */
+	text: Scalars['String']['output'];
+	/** Type of suggestion */
+	type: SuggestionType;
+};
+
+export type SearchSuggestionsInput = {
+	/** Filter suggestions by specific categories/collections */
+	collectionIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+	/** HTML tag to close matched text highlighting (default: "</em>") */
+	highlightPostTag?: InputMaybe<Scalars['String']['input']>;
+	/** HTML tag to wrap matched text for highlighting (default: "<em>") */
+	highlightPreTag?: InputMaybe<Scalars['String']['input']>;
+	/** Maximum number of suggestions to return (default: 10, max: 50) */
+	limit?: InputMaybe<Scalars['Int']['input']>;
+	/** Partial search term to get suggestions for */
+	term: Scalars['String']['input'];
+	/** Types of suggestions to include */
+	types?: InputMaybe<Array<SuggestionType>>;
+};
+
+export type SearchSuggestionsResponse = {
+	__typename?: 'SearchSuggestionsResponse';
+	/** Execution time in milliseconds */
+	executionTimeMs: Scalars['Float']['output'];
+	/** Array of search suggestions */
+	suggestions: Array<SearchSuggestion>;
+	/** Total number of suggestions found */
+	totalCount: Scalars['Int']['output'];
+};
+
 export type Seller = Node & {
 	__typename?: 'Seller';
 	createdAt: Scalars['DateTime']['output'];
-	customFields?: Maybe<Scalars['JSON']['output']>;
+	customFields?: Maybe<SellerCustomFields>;
 	id: Scalars['ID']['output'];
 	name: Scalars['String']['output'];
 	updatedAt: Scalars['DateTime']['output'];
+};
+
+export type SellerCustomFields = {
+	__typename?: 'SellerCustomFields';
+	sellerPostalCode?: Maybe<Scalars['String']['output']>;
 };
 
 export type SetCustomerForOrderResult =
@@ -3281,6 +3497,8 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder];
 export type StringCustomFieldConfig = CustomField & {
 	__typename?: 'StringCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
 	label?: Maybe<Array<LocalizedString>>;
@@ -3334,6 +3552,8 @@ export type StringStructFieldConfig = StructField & {
 
 export type StructCustomFieldConfig = CustomField & {
 	__typename?: 'StructCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	fields: Array<StructFieldConfig>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
@@ -3370,6 +3590,14 @@ export type Success = {
 	success: Scalars['Boolean']['output'];
 };
 
+export const SuggestionType = {
+	Brand: 'BRAND',
+	Category: 'CATEGORY',
+	Completion: 'COMPLETION',
+	Product: 'PRODUCT',
+} as const;
+
+export type SuggestionType = (typeof SuggestionType)[keyof typeof SuggestionType];
 export type Surcharge = Node & {
 	__typename?: 'Surcharge';
 	createdAt: Scalars['DateTime']['output'];
@@ -3435,6 +3663,8 @@ export type TaxRateList = PaginatedList & {
 
 export type TextCustomFieldConfig = CustomField & {
 	__typename?: 'TextCustomFieldConfig';
+	deprecated?: Maybe<Scalars['Boolean']['output']>;
+	deprecationReason?: Maybe<Scalars['String']['output']>;
 	description?: Maybe<Array<LocalizedString>>;
 	internal?: Maybe<Scalars['Boolean']['output']>;
 	label?: Maybe<Array<LocalizedString>>;
@@ -3455,6 +3685,13 @@ export type TextStructFieldConfig = StructField & {
 	name: Scalars['String']['output'];
 	type: Scalars['String']['output'];
 	ui?: Maybe<Scalars['JSON']['output']>;
+};
+
+export type TrackSearchTermInput = {
+	/** Source of the search (e.g., "autocomplete", "manual", "voice") */
+	source?: InputMaybe<Scalars['String']['input']>;
+	/** The search term that was used */
+	term: Scalars['String']['input'];
 };
 
 export type TransitionOrderToStateResult = Order | OrderStateTransitionError;
@@ -3502,9 +3739,27 @@ export type UpdateCustomerPasswordResult =
 	| PasswordValidationError
 	| Success;
 
+/**
+ * Returned when multiple items are added to an Order.
+ * The errorResults array contains the errors that occurred for each item, if any.
+ */
+export type UpdateMultipleOrderItemsResult = {
+	__typename?: 'UpdateMultipleOrderItemsResult';
+	errorResults: Array<UpdateOrderItemErrorResult>;
+	order: Order;
+};
+
 export type UpdateOrderInput = {
 	customFields?: InputMaybe<Scalars['JSON']['input']>;
 };
+
+/** Union type of all possible errors that can occur when adding or removing items from an Order. */
+export type UpdateOrderItemErrorResult =
+	| InsufficientStockError
+	| NegativeQuantityError
+	| OrderInterceptorError
+	| OrderLimitError
+	| OrderModificationError;
 
 export type UpdateOrderItemsResult =
 	| InsufficientStockError

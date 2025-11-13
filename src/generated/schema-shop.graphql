@@ -1,5 +1,10 @@
 union ActiveOrderResult = NoActiveOrderError | Order
 
+input AddItemInput {
+	productVariantId: ID!
+	quantity: Int!
+}
+
 union AddPaymentToOrderResult =
 	| IneligiblePaymentMethodError
 	| NoActiveOrderError
@@ -97,6 +102,8 @@ type AuthenticationMethod implements Node {
 union AuthenticationResult = CurrentUser | InvalidCredentialsError | NotVerifiedError
 
 type BooleanCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	internal: Boolean
 	label: [LocalizedString!]
@@ -394,6 +401,18 @@ input CreateCustomerInput {
 	lastName: String!
 	phoneNumber: String
 	title: String
+}
+
+input CreateSellerCustomFieldsInput {
+	sellerPostalCode: String
+}
+
+input CreateSellerInput {
+	customFields: CreateSellerCustomFieldsInput
+	emailAddress: String!
+	firstName: String!
+	lastName: String!
+	password: String!
 }
 
 """
@@ -1203,6 +1222,8 @@ type CurrentUserChannel {
 }
 
 interface CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	internal: Boolean
 	label: [LocalizedString!]
@@ -1226,6 +1247,20 @@ union CustomFieldConfig =
 	| StringCustomFieldConfig
 	| StructCustomFieldConfig
 	| TextCustomFieldConfig
+
+union CustomMappings = CustomProductMappings | CustomProductVariantMappings
+
+type CustomProductMappings {
+	sellerNames: [String!]
+	sellerPostalCodes: [String!]
+}
+
+type CustomProductVariantMappings {
+	releaseDate: String
+	sellerName: String
+	sellerPostalCode: String
+	variantMRP: Int
+}
 
 type Customer implements Node {
 	addresses: [Address!]
@@ -1340,6 +1375,8 @@ Expects the same validation formats as the `<input type="datetime-local">` HTML 
 See https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/datetime-local#Additional_attributes
 """
 type DateTimeCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	internal: Boolean
 	label: [LocalizedString!]
@@ -1616,6 +1653,8 @@ type FacetValueTranslation {
 }
 
 type FloatCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	internal: Boolean
 	label: [LocalizedString!]
@@ -1826,6 +1865,8 @@ type InsufficientStockError implements ErrorResult {
 }
 
 type IntCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	internal: Boolean
 	label: [LocalizedString!]
@@ -2664,6 +2705,8 @@ enum LanguageCode {
 }
 
 type LocaleStringCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	internal: Boolean
 	label: [LocalizedString!]
@@ -2679,6 +2722,8 @@ type LocaleStringCustomFieldConfig implements CustomField {
 }
 
 type LocaleTextCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	internal: Boolean
 	label: [LocalizedString!]
@@ -2719,6 +2764,11 @@ type Mutation {
 	Adds an item to the Order. If custom fields are defined on the OrderLine entity, a third argument 'customFields' will be available.
 	"""
 	addItemToOrder(productVariantId: ID!, quantity: Int!): UpdateOrderItemsResult!
+
+	"""
+	Adds mutliple items to the Order. Returns a list of errors for each item that failed to add. It will still add successful items.
+	"""
+	addItemsToOrder(inputs: [AddItemInput!]!): UpdateMultipleOrderItemsResult!
 
 	"""
 	Add a Payment to the Order
@@ -2786,6 +2836,7 @@ type Mutation {
 	3. The Customer _must_ be registered _with_ a password. No further action is needed - the Customer is able to authenticate immediately.
 	"""
 	registerCustomerAccount(input: RegisterCustomerInput!): RegisterCustomerAccountResult!
+	registerNewSeller(input: RegisterSellerInput!): Channel
 
 	"""
 	Remove all OrderLine from the Order
@@ -2850,6 +2901,12 @@ type Mutation {
 	shipping method will apply to.
 	"""
 	setOrderShippingMethod(shippingMethodId: [ID!]!): SetOrderShippingMethodResult!
+
+	"""
+	Track a search term usage for analytics.
+	Call this when a user performs a search to build popular search terms.
+	"""
+	trackSearchTerm(input: TrackSearchTermInput!): Boolean!
 
 	"""
 	Transitions an Order to a new state. Valid next states can be found by querying `nextOrderStates`
@@ -3945,12 +4002,39 @@ enum Permission {
 	UpdateZone
 }
 
+type PopularSearchTerm {
+	"""
+	Number of times this term has been searched
+	"""
+	count: Int!
+
+	"""
+	Last time this term was searched
+	"""
+	lastSearched: String!
+
+	"""
+	The search term
+	"""
+	term: String!
+}
+
 """
 The price range where the result has more than one price
 """
 type PriceRange {
 	max: Money!
 	min: Money!
+}
+
+type PriceRangeBucket {
+	count: Int!
+	to: Int!
+}
+
+input PriceRangeInput {
+	max: Int!
+	min: Int!
 }
 
 type Product implements Node {
@@ -3966,6 +4050,7 @@ type Product implements Node {
 	languageCode: LanguageCode!
 	name: String!
 	optionGroups: [ProductOptionGroup!]!
+	productSellerInfo: Seller
 	slug: String!
 	translations: [ProductTranslation!]!
 	updatedAt: DateTime!
@@ -4090,7 +4175,7 @@ type ProductVariant implements Node {
 	assets: [Asset!]!
 	createdAt: DateTime!
 	currencyCode: CurrencyCode!
-	customFields: JSON
+	customFields: ProductVariantCustomFields
 	facetValues: [FacetValue!]!
 	featuredAsset: Asset
 	id: ID!
@@ -4109,6 +4194,11 @@ type ProductVariant implements Node {
 	updatedAt: DateTime!
 }
 
+type ProductVariantCustomFields {
+	releaseDate: DateTime
+	variantMRP: Int
+}
+
 input ProductVariantFilterParameter {
 	_and: [ProductVariantFilterParameter!]
 	_or: [ProductVariantFilterParameter!]
@@ -4120,9 +4210,11 @@ input ProductVariantFilterParameter {
 	price: NumberOperators
 	priceWithTax: NumberOperators
 	productId: IDOperators
+	releaseDate: DateOperators
 	sku: StringOperators
 	stockLevel: StringOperators
 	updatedAt: DateOperators
+	variantMRP: NumberOperators
 }
 
 type ProductVariantList implements PaginatedList {
@@ -4164,9 +4256,11 @@ input ProductVariantSortParameter {
 	price: SortOrder
 	priceWithTax: SortOrder
 	productId: SortOrder
+	releaseDate: SortOrder
 	sku: SortOrder
 	stockLevel: SortOrder
 	updatedAt: SortOrder
+	variantMRP: SortOrder
 }
 
 type ProductVariantTranslation {
@@ -4229,6 +4323,24 @@ type ProvinceList implements PaginatedList {
 	totalItems: Int!
 }
 
+type PublicPaymentMethod {
+	code: String!
+	customFields: JSON
+	description: String
+	id: ID!
+	name: String!
+	translations: [PaymentMethodTranslation!]!
+}
+
+type PublicShippingMethod {
+	code: String!
+	customFields: JSON
+	description: String
+	id: ID!
+	name: String!
+	translations: [ShippingMethodTranslation!]!
+}
+
 type Query {
 	"""
 	The active Channel
@@ -4246,6 +4358,16 @@ type Query {
 	query will once again return `null`.
 	"""
 	activeOrder: Order
+
+	"""
+	Get active payment methods
+	"""
+	activePaymentMethods: [PublicPaymentMethod]!
+
+	"""
+	Get active shipping methods
+	"""
+	activeShippingMethods: [PublicShippingMethod]!
 
 	"""
 	An array of supported Countries
@@ -4308,6 +4430,12 @@ type Query {
 	orderByCode(code: String!): Order
 
 	"""
+	Get popular search terms for the current channel.
+	Useful for displaying trending searches.
+	"""
+	popularSearchTerms(limit: Int = 10): [PopularSearchTerm!]!
+
+	"""
 	Get a Product either by id or slug. If neither 'id' nor 'slug' is specified, an error will result.
 	"""
 	product(id: ID, slug: String): Product
@@ -4321,6 +4449,12 @@ type Query {
 	Search Products based on the criteria set by the `SearchInput`
 	"""
 	search(input: SearchInput!): SearchResponse!
+
+	"""
+	Get search suggestions based on partial input.
+	Provides autocomplete/typeahead functionality for the storefront.
+	"""
+	searchSuggestions(input: SearchSuggestionsInput!): SearchSuggestionsResponse!
 }
 
 union RefreshCustomerVerificationResult = NativeAuthStrategyError | Success
@@ -4388,7 +4522,14 @@ input RegisterCustomerInput {
 	title: String
 }
 
+input RegisterSellerInput {
+	seller: CreateSellerInput!
+	shopName: String!
+}
+
 type RelationCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	entity: String!
 	internal: Boolean
@@ -4441,7 +4582,11 @@ input SearchInput {
 	collectionSlug: String
 	facetValueFilters: [FacetValueFilterInput!]
 	groupByProduct: Boolean
+	groupBySKU: Boolean
 	inStock: Boolean
+	priceRange: PriceRangeInput
+	priceRangeWithTax: PriceRangeInput
+	sellerPostalCode: String
 	skip: Int
 	sort: SearchResultSortParameter
 	take: Int
@@ -4456,7 +4601,15 @@ type SearchResponse {
 	collections: [CollectionResult!]!
 	facetValues: [FacetValueResult!]!
 	items: [SearchResult!]!
+	prices: SearchResponsePriceData!
 	totalItems: Int!
+}
+
+type SearchResponsePriceData {
+	buckets: [PriceRangeBucket!]!
+	bucketsWithTax: [PriceRangeBucket!]!
+	range: PriceRange!
+	rangeWithTax: PriceRange!
 }
 
 type SearchResult {
@@ -4465,10 +4618,14 @@ type SearchResult {
 	"""
 	collectionIds: [ID!]!
 	currencyCode: CurrencyCode!
+	customMappings: CustomMappings!
+		@deprecated(reason: "Use customProductMappings or customProductVariantMappings")
+	customProductMappings: CustomProductMappings!
+	customProductVariantMappings: CustomProductVariantMappings!
 	description: String!
 	facetIds: [ID!]!
 	facetValueIds: [ID!]!
-	inStock: Boolean!
+	inStock: Boolean
 	price: SearchResultPrice!
 	priceWithTax: SearchResultPrice!
 	productAsset: SearchResultAsset
@@ -4502,12 +4659,100 @@ input SearchResultSortParameter {
 	price: SortOrder
 }
 
+type SearchSuggestion {
+	brandName: String
+	categoryId: ID
+	categoryName: String
+
+	"""
+	Highlighted text with matched terms wrapped in HTML tags
+	"""
+	highlighted: String!
+	inStock: Boolean
+	price: Int
+	productCount: Int
+
+	"""
+	Additional metadata for the suggestion
+	"""
+	productId: ID
+	productName: String
+
+	"""
+	Relevance score (0.0 to 1.0)
+	"""
+	score: Float!
+
+	"""
+	The suggestion text
+	"""
+	text: String!
+
+	"""
+	Type of suggestion
+	"""
+	type: SuggestionType!
+}
+
+input SearchSuggestionsInput {
+	"""
+	Filter suggestions by specific categories/collections
+	"""
+	collectionIds: [ID!]
+
+	"""
+	HTML tag to close matched text highlighting (default: "</em>")
+	"""
+	highlightPostTag: String = "</em>"
+
+	"""
+	HTML tag to wrap matched text for highlighting (default: "<em>")
+	"""
+	highlightPreTag: String = "<em>"
+
+	"""
+	Maximum number of suggestions to return (default: 10, max: 50)
+	"""
+	limit: Int = 10
+
+	"""
+	Partial search term to get suggestions for
+	"""
+	term: String!
+
+	"""
+	Types of suggestions to include
+	"""
+	types: [SuggestionType!] = [PRODUCT, CATEGORY, BRAND, COMPLETION]
+}
+
+type SearchSuggestionsResponse {
+	"""
+	Execution time in milliseconds
+	"""
+	executionTimeMs: Float!
+
+	"""
+	Array of search suggestions
+	"""
+	suggestions: [SearchSuggestion!]!
+
+	"""
+	Total number of suggestions found
+	"""
+	totalCount: Int!
+}
+
 type Seller implements Node {
 	createdAt: DateTime!
-	customFields: JSON
+	customFields: SellerCustomFields
 	id: ID!
 	name: String!
 	updatedAt: DateTime!
+}
+
+type SellerCustomFields {
+	sellerPostalCode: String
 }
 
 union SetCustomerForOrderResult =
@@ -4591,6 +4836,8 @@ enum SortOrder {
 }
 
 type StringCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	internal: Boolean
 	label: [LocalizedString!]
@@ -4645,6 +4892,8 @@ type StringStructFieldConfig implements StructField {
 }
 
 type StructCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	fields: [StructFieldConfig!]!
 	internal: Boolean
@@ -4680,6 +4929,13 @@ Indicates that an operation succeeded, where we do not want to return any more s
 """
 type Success {
 	success: Boolean!
+}
+
+enum SuggestionType {
+	BRAND
+	CATEGORY
+	COMPLETION
+	PRODUCT
 }
 
 type Surcharge implements Node {
@@ -4739,6 +4995,8 @@ type TaxRateList implements PaginatedList {
 }
 
 type TextCustomFieldConfig implements CustomField {
+	deprecated: Boolean
+	deprecationReason: String
 	description: [LocalizedString!]
 	internal: Boolean
 	label: [LocalizedString!]
@@ -4758,6 +5016,18 @@ type TextStructFieldConfig implements StructField {
 	name: String!
 	type: String!
 	ui: JSON
+}
+
+input TrackSearchTermInput {
+	"""
+	Source of the search (e.g., "autocomplete", "manual", "voice")
+	"""
+	source: String = "manual"
+
+	"""
+	The search term that was used
+	"""
+	term: String!
 }
 
 union TransitionOrderToStateResult = Order | OrderStateTransitionError
@@ -4805,9 +5075,28 @@ union UpdateCustomerPasswordResult =
 	| PasswordValidationError
 	| Success
 
+"""
+Returned when multiple items are added to an Order.
+The errorResults array contains the errors that occurred for each item, if any.
+"""
+type UpdateMultipleOrderItemsResult {
+	errorResults: [UpdateOrderItemErrorResult!]!
+	order: Order!
+}
+
 input UpdateOrderInput {
 	customFields: JSON
 }
+
+"""
+Union type of all possible errors that can occur when adding or removing items from an Order.
+"""
+union UpdateOrderItemErrorResult =
+	| InsufficientStockError
+	| NegativeQuantityError
+	| OrderInterceptorError
+	| OrderLimitError
+	| OrderModificationError
 
 union UpdateOrderItemsResult =
 	| InsufficientStockError

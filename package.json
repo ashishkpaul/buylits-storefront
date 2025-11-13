@@ -47,6 +47,7 @@
 		"autoprefixer": "10.4.21",
 		"compiled-i18n": "^1.2.1",
 		"concurrently": "9.2.1",
+		"dotenv": "^17.2.3",
 		"eslint": "8.57.0",
 		"eslint-plugin-qwik": "2.0.0-beta.13",
 		"husky": "^9.1.7",
