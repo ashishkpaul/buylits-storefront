@@ -6,11 +6,7 @@ An e-commerce storefront for [Vendure](https://www.vendure.io) built with [Qwik]
 
 ## Core Web Vitals
 
-<br/>
-
 ![pagespeed.web.dev](docs/metrics.png)
-
-<br/>
 
 ### 📑 [Guide: Spin up an e-commerce app in 60s with Vendure + Qwik](https://dev.to/prasmalla/in-2023-set-up-a-nodejs-e-commerce-app-in-1-minute-with-vendure-qwik-bl7)
 
@@ -101,3 +97,129 @@ The resulting language should match your browser language. You can also override
 - [Qwik Github](https://github.com/BuilderIO/qwik)
 - [@QwikDev](https://twitter.com/QwikDev)
 - [Qwik Discord](https://qwik.builder.io/chat)
+
+## Production — Self-hosted VM
+
+If you plan to host the storefront on a self-managed virtual machine, follow these steps to run the app, terminate TLS at a reverse proxy (nginx) and secure the site with Let's Encrypt. This guide assumes an Ubuntu/Debian-like VM. Do NOT use development certificates in production and never commit private keys to the repository.
+
+1. Point your DNS
+
+- Create A (or AAAA) records for your domain (e.g. example.com) pointing to the VM public IP.
+
+1. Install nginx and certbot
+
+```bash
+sudo apt update
+sudo apt install -y nginx certbot python3-certbot-nginx
+```
+
+1. Build and run the storefront app
+
+From the `storefront` folder build the production artifacts and run your server on a local port (example: 8080):
+
+```bash
+pnpm build
+NODE_ENV=production node ./dist/server.js
+```
+
+Run the app under a process manager or systemd unit so it restarts on crash/reboot. Example systemd unit `/etc/systemd/system/storefront.service`:
+
+```ini
+[Unit]
+Description=Storefront App
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/home/ashish/aa/projects/ecom/storefront
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /home/ashish/aa/projects/ecom/storefront/dist/server.js
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now storefront.service
+```
+
+1. Obtain and install a Let's Encrypt certificate
+
+With nginx running, request a certificate for your domain (replace `example.com`):
+
+```bash
+sudo certbot --nginx -d example.com -d www.example.com
+```
+
+This will configure nginx for HTTPS and set up automatic renewals.
+
+1. Example nginx reverse proxy
+
+Create `/etc/nginx/sites-available/storefront` (or let certbot create it). Minimal example:
+
+```nginx
+server {
+    listen 80;
+    server_name example.com www.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.com www.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080; # your app
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+}
+```
+
+Enable and reload nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/storefront /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+1. Firewall
+
+```bash
+sudo ufw allow 'Nginx Full'
+sudo ufw enable
+```
+
+1. Renewal test
+
+```bash
+sudo certbot renew --dry-run
+```
+
+Security notes
+
+- Never commit private keys to the repository. Keep certs in `/etc/letsencrypt` (or use a secret manager).
+- Use secure permissions on keys: `sudo chmod 600 /etc/letsencrypt/live/*/privkey.pem`.
+- Monitor and automate the app with systemd, PM2, or a container orchestrator.
+- Only enable HSTS after verifying HTTPS works for all subdomains.
+
+If you'd like, I can create the systemd unit and nginx config tailored to your domain and path, or prepare a Docker Compose / Traefik example. Tell me which approach you prefer and your domain.
