@@ -1,0 +1,38 @@
+query searchExtended($input: SearchInput!) {
+	search(input: $input) {
+		totalItems
+
+		facetValues {
+			count
+			facetValue {
+				id
+				name
+				facet {
+					id
+					name
+				}
+			}
+		}
+
+		collections {
+			count
+			collection {
+				id
+				name
+				slug
+				parent {
+					id
+				}
+			}
+		}
+
+		prices {
+			...SearchPriceData
+		}
+
+		items {
+			...ListedProductEnhanced
+			...SellerProductMappings
+		}
+	}
+}

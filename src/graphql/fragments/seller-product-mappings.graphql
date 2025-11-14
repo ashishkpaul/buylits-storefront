@@ -1,0 +1,12 @@
+fragment SellerProductMappings on SearchResult {
+	customProductMappings {
+		sellerNames
+		sellerPostalCodes
+	}
+	customProductVariantMappings {
+		sellerName
+		sellerPostalCode
+		variantMRP
+		releaseDate
+	}
+}

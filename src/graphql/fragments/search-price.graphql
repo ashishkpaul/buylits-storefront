@@ -1,0 +1,18 @@
+fragment SearchPriceData on SearchResponsePriceData {
+	rangeWithTax {
+		min
+		max
+	}
+	range {
+		min
+		max
+	}
+	bucketsWithTax {
+		to
+		count
+	}
+	buckets {
+		to
+		count
+	}
+}

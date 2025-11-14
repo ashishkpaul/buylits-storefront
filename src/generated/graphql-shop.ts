@@ -3358,6 +3358,7 @@ export type SearchSuggestion = {
 	brandName?: Maybe<Scalars['String']['output']>;
 	categoryId?: Maybe<Scalars['ID']['output']>;
 	categoryName?: Maybe<Scalars['String']['output']>;
+	categorySlug?: Maybe<Scalars['String']['output']>;
 	/** Highlighted text with matched terms wrapped in HTML tags */
 	highlighted: Scalars['String']['output'];
 	inStock?: Maybe<Scalars['Boolean']['output']>;
@@ -3819,6 +3820,131 @@ export type Zone = Node & {
 	members: Array<Region>;
 	name: Scalars['String']['output'];
 	updatedAt: Scalars['DateTime']['output'];
+};
+
+export type ListedProductEnhancedFragment = {
+	__typename?: 'SearchResult';
+	productId: string;
+	productName: string;
+	slug: string;
+	currencyCode: CurrencyCode;
+	productAsset?: { __typename?: 'SearchResultAsset'; id: string; preview: string } | null;
+	priceWithTax:
+		| { __typename?: 'PriceRange'; min: any; max: any }
+		| { __typename?: 'SinglePrice'; value: any };
+};
+
+export type SearchPriceDataFragment = {
+	__typename?: 'SearchResponsePriceData';
+	rangeWithTax: { __typename?: 'PriceRange'; min: any; max: any };
+	range: { __typename?: 'PriceRange'; min: any; max: any };
+	bucketsWithTax: Array<{ __typename?: 'PriceRangeBucket'; to: number; count: number }>;
+	buckets: Array<{ __typename?: 'PriceRangeBucket'; to: number; count: number }>;
+};
+
+export type SellerProductMappingsFragment = {
+	__typename?: 'SearchResult';
+	customProductMappings: {
+		__typename?: 'CustomProductMappings';
+		sellerNames?: Array<string> | null;
+		sellerPostalCodes?: Array<string> | null;
+	};
+	customProductVariantMappings: {
+		__typename?: 'CustomProductVariantMappings';
+		sellerName?: string | null;
+		sellerPostalCode?: string | null;
+		variantMRP?: number | null;
+		releaseDate?: string | null;
+	};
+};
+
+export type SearchExtendedQueryVariables = Exact<{
+	input: SearchInput;
+}>;
+
+export type SearchExtendedQuery = {
+	__typename?: 'Query';
+	search: {
+		__typename?: 'SearchResponse';
+		totalItems: number;
+		facetValues: Array<{
+			__typename?: 'FacetValueResult';
+			count: number;
+			facetValue: {
+				__typename?: 'FacetValue';
+				id: string;
+				name: string;
+				facet: { __typename?: 'Facet'; id: string; name: string };
+			};
+		}>;
+		collections: Array<{
+			__typename?: 'CollectionResult';
+			count: number;
+			collection: {
+				__typename?: 'Collection';
+				id: string;
+				name: string;
+				slug: string;
+				parent?: { __typename?: 'Collection'; id: string } | null;
+			};
+		}>;
+		prices: {
+			__typename?: 'SearchResponsePriceData';
+			rangeWithTax: { __typename?: 'PriceRange'; min: any; max: any };
+			range: { __typename?: 'PriceRange'; min: any; max: any };
+			bucketsWithTax: Array<{ __typename?: 'PriceRangeBucket'; to: number; count: number }>;
+			buckets: Array<{ __typename?: 'PriceRangeBucket'; to: number; count: number }>;
+		};
+		items: Array<{
+			__typename?: 'SearchResult';
+			productId: string;
+			productName: string;
+			slug: string;
+			currencyCode: CurrencyCode;
+			productAsset?: { __typename?: 'SearchResultAsset'; id: string; preview: string } | null;
+			priceWithTax:
+				| { __typename?: 'PriceRange'; min: any; max: any }
+				| { __typename?: 'SinglePrice'; value: any };
+			customProductMappings: {
+				__typename?: 'CustomProductMappings';
+				sellerNames?: Array<string> | null;
+				sellerPostalCodes?: Array<string> | null;
+			};
+			customProductVariantMappings: {
+				__typename?: 'CustomProductVariantMappings';
+				sellerName?: string | null;
+				sellerPostalCode?: string | null;
+				variantMRP?: number | null;
+				releaseDate?: string | null;
+			};
+		}>;
+	};
+};
+
+export type SearchSuggestionsQueryVariables = Exact<{
+	input: SearchSuggestionsInput;
+}>;
+
+export type SearchSuggestionsQuery = {
+	__typename?: 'Query';
+	searchSuggestions: {
+		__typename?: 'SearchSuggestionsResponse';
+		totalCount: number;
+		executionTimeMs: number;
+		suggestions: Array<{
+			__typename?: 'SearchSuggestion';
+			text: string;
+			type: SuggestionType;
+			highlighted: string;
+			score: number;
+			productId?: string | null;
+			productName?: string | null;
+			brandName?: string | null;
+			categorySlug?: string | null;
+			categoryName?: string | null;
+			productCount?: number | null;
+		}>;
+	};
 };
 
 export type LoginMutationVariables = Exact<{
@@ -5549,6 +5675,61 @@ export type SearchQuery = {
 	};
 };
 
+export const ListedProductEnhancedFragmentDoc = gql`
+	fragment ListedProductEnhanced on SearchResult {
+		productId
+		productName
+		slug
+		productAsset {
+			id
+			preview
+		}
+		currencyCode
+		priceWithTax {
+			... on PriceRange {
+				min
+				max
+			}
+			... on SinglePrice {
+				value
+			}
+		}
+	}
+`;
+export const SearchPriceDataFragmentDoc = gql`
+	fragment SearchPriceData on SearchResponsePriceData {
+		rangeWithTax {
+			min
+			max
+		}
+		range {
+			min
+			max
+		}
+		bucketsWithTax {
+			to
+			count
+		}
+		buckets {
+			to
+			count
+		}
+	}
+`;
+export const SellerProductMappingsFragmentDoc = gql`
+	fragment SellerProductMappings on SearchResult {
+		customProductMappings {
+			sellerNames
+			sellerPostalCodes
+		}
+		customProductVariantMappings {
+			sellerName
+			sellerPostalCode
+			variantMRP
+			releaseDate
+		}
+	}
+`;
 export const AddressFragmentDoc = gql`
 	fragment Address on Address {
 		id
@@ -5712,6 +5893,65 @@ export const ListedProductFragmentDoc = gql`
 			}
 			... on SinglePrice {
 				value
+			}
+		}
+	}
+`;
+export const SearchExtendedDocument = gql`
+	query searchExtended($input: SearchInput!) {
+		search(input: $input) {
+			totalItems
+			facetValues {
+				count
+				facetValue {
+					id
+					name
+					facet {
+						id
+						name
+					}
+				}
+			}
+			collections {
+				count
+				collection {
+					id
+					name
+					slug
+					parent {
+						id
+					}
+				}
+			}
+			prices {
+				...SearchPriceData
+			}
+			items {
+				...ListedProductEnhanced
+				...SellerProductMappings
+			}
+		}
+	}
+	${SearchPriceDataFragmentDoc}
+	${ListedProductEnhancedFragmentDoc}
+	${SellerProductMappingsFragmentDoc}
+`;
+export const SearchSuggestionsDocument = gql`
+	query searchSuggestions($input: SearchSuggestionsInput!) {
+		searchSuggestions(input: $input) {
+			totalCount
+			executionTimeMs
+			suggestions {
+				text
+				type
+				highlighted
+				score
+				productId
+				productName
+				brandName
+				categorySlug
+				categoryName
+				productCount
 			}
 		}
 	}
@@ -6185,6 +6425,26 @@ export type Requester<C = {}> = <R, V>(
 ) => Promise<R> | AsyncIterable<R>;
 export function getSdk<C>(requester: Requester<C>) {
 	return {
+		searchExtended(
+			variables: SearchExtendedQueryVariables,
+			options?: C
+		): Promise<SearchExtendedQuery> {
+			return requester<SearchExtendedQuery, SearchExtendedQueryVariables>(
+				SearchExtendedDocument,
+				variables,
+				options
+			) as Promise<SearchExtendedQuery>;
+		},
+		searchSuggestions(
+			variables: SearchSuggestionsQueryVariables,
+			options?: C
+		): Promise<SearchSuggestionsQuery> {
+			return requester<SearchSuggestionsQuery, SearchSuggestionsQueryVariables>(
+				SearchSuggestionsDocument,
+				variables,
+				options
+			) as Promise<SearchSuggestionsQuery>;
+		},
 		login(variables: LoginMutationVariables, options?: C): Promise<LoginMutation> {
 			return requester<LoginMutation, LoginMutationVariables>(
 				LoginDocument,

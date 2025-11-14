@@ -4663,6 +4663,7 @@ type SearchSuggestion {
 	brandName: String
 	categoryId: ID
 	categoryName: String
+	categorySlug: String
 
 	"""
 	Highlighted text with matched terms wrapped in HTML tags

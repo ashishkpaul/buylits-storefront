@@ -16,7 +16,7 @@ const config: CodegenConfig = {
 		'type Mutation { createStripePaymentIntent: String }',
 		'type Query { generateBraintreeClientToken(orderId: ID, includeCustomerId: Boolean): String }',
 	],
-	documents: ['"src/providers/shop/**/*.{ts,tsx}"', '!src/generated/*'],
+	documents: ['src/providers/shop/**/*.{ts,tsx}', 'src/graphql/**/*.graphql', '!src/generated/*'],
 	generates: {
 		'src/generated/graphql-shop.ts': {
 			config: {

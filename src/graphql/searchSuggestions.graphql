@@ -1,0 +1,18 @@
+query searchSuggestions($input: SearchSuggestionsInput!) {
+	searchSuggestions(input: $input) {
+		totalCount
+		executionTimeMs
+		suggestions {
+			text
+			type
+			highlighted
+			score
+			productId
+			productName
+			brandName
+			categorySlug
+			categoryName
+			productCount
+		}
+	}
+}
