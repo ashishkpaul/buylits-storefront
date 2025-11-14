@@ -10,11 +10,7 @@ export async function searchExtendedProducts(params: {
 	take?: number;
 	selectedFacets?: SelectedFacets;
 	collectionSlug?: string;
-	collectionId?: string;
 	sellerPostalCode?: string;
-	inStock?: boolean;
-	sort?: { field: 'name' | 'price'; direction: 'ASC' | 'DESC' };
-	groupByProduct?: boolean;
 }) {
 	const {
 		term,
@@ -22,30 +18,44 @@ export async function searchExtendedProducts(params: {
 		take = 24,
 		selectedFacets = {},
 		collectionSlug,
-		collectionId,
 		sellerPostalCode,
-		inStock,
-		sort,
-		groupByProduct = true,
 	} = params;
 
 	const skip = (page - 1) * take;
-	const facetValueFilters = buildFacetValueFilters(selectedFacets);
-	const sortInput = sort ? [{ [sort.field]: sort.direction }] : undefined;
 
-	const input: any = {
+	// Build facet value filters - this converts { "facet1": ["fv_1", "fv_2"], "facet2": ["fv_3"] }
+	// into the format expected by Elasticsearch
+	const facetValueFilters = buildFacetValueFilters(selectedFacets);
+
+	console.log('🔍 [STOREFRONT] Search params:', {
 		term,
-		take,
-		skip,
-		groupByProduct,
 		facetValueFilters,
 		collectionSlug,
-		collectionId,
 		sellerPostalCode,
-		inStock,
-		sort: sortInput,
+	});
+
+	const input: any = {
+		term: term || '',
+		take,
+		skip,
+		groupByProduct: true,
+		...(facetValueFilters.length > 0 && { facetValueFilters }),
+		...(collectionSlug && { collectionSlug }),
+		...(sellerPostalCode && { sellerPostalCode }),
 	};
 
-	const { search } = await sdk.searchExtended({ input });
-	return search;
+	try {
+		const response = await sdk.searchExtended({ input });
+
+		console.log('🔍 [STOREFRONT] Search response:', {
+			totalItems: response.search?.totalItems,
+			facetValues: response.search?.facetValues?.length,
+			items: response.search?.items?.length,
+		});
+
+		return response.search;
+	} catch (error) {
+		console.error('❌ Search error:', error);
+		throw error;
+	}
 }

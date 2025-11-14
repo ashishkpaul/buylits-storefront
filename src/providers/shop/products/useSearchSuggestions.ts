@@ -7,6 +7,8 @@ export async function fetchSearchSuggestions(term: string, limit = 8) {
 	if (!term || term.trim().length < 2) {
 		return { suggestions: [], totalCount: 0, executionTimeMs: 0 };
 	}
-	const { searchSuggestions } = await sdk.searchSuggestions({ term, limit });
-	return searchSuggestions;
+	const result = await sdk.searchSuggestions({
+		input: { term, limit },
+	});
+	return result.searchSuggestions || { suggestions: [], totalCount: 0, executionTimeMs: 0 };
 }

@@ -3,10 +3,18 @@ export type SelectedFacets = Record<string, string[]>;
 
 export function buildFacetValueFilters(selected: SelectedFacets) {
 	const filters: Array<{ or?: string[] }> = [];
-	for (const valueIds of Object.values(selected)) {
+
+	console.log('🔍 [FACET-BUILDER] Input facets:', selected);
+
+	for (const [facetCode, valueIds] of Object.entries(selected)) {
 		if (!valueIds?.length) continue;
-		// OR within same facet group, AND across groups
+
+		// OR within the same facet group; AND across different groups
 		filters.push({ or: valueIds });
+
+		console.log('🔍 [FACET-BUILDER] Added filter for', facetCode, ':', valueIds);
 	}
+
+	console.log('🔍 [FACET-BUILDER] Final filters:', filters);
 	return filters;
 }
