@@ -26,3 +26,5 @@ export interface Options {
 
 // @ts-ignore
 export const shopSdk = getShopSdk<Options>(requester);
+
+export { requester };

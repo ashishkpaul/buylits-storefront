@@ -3,21 +3,22 @@ import { routeLoader$, useLocation } from '@qwik.dev/router';
 import Filters from '~/components/facet-filter-controls/Filters';
 import FiltersButton from '~/components/filters-button/FiltersButton';
 import ProductCard from '~/components/products/ProductCard';
-import { SearchResponse } from '~/generated/graphql';
-import { searchQueryWithTerm } from '~/providers/shop/products/products';
+import { searchExtendedProducts } from '~/providers/shop/products/fetchProducts';
 import { FacetWithValues } from '~/types';
 import { changeUrlParamsWithoutRefresh, enableDisableFacetValues, groupFacetValues } from '~/utils';
 
-export const executeQuery = $(
-	async (term: string, activeFacetValueIds: string[]) =>
-		await searchQueryWithTerm('', term, activeFacetValueIds)
-);
-
 export const useSearchLoader = routeLoader$(async ({ query }) => {
 	const term = query.get('q') || '';
-	const activeFacetValueIds: string[] = query.get('f')?.split('-') || [];
-	const search = await executeQuery(term, activeFacetValueIds);
-	return { search, query };
+	const facetIds = query.get('f')?.split('-') || [];
+	const sellerPostalCode = query.get('seller') || '';
+
+	const search = await searchExtendedProducts({
+		term: term || undefined,
+		selectedFacets: {}, // parse facetIds from URL as needed
+		sellerPostalCode: sellerPostalCode || undefined,
+	});
+
+	return { search, term, facetIds, sellerPostalCode };
 });
 
 export default component$(() => {
@@ -25,28 +26,37 @@ export default component$(() => {
 	const searchLoader = useSearchLoader();
 
 	const term = url.searchParams.get('q') || '';
+	const facetIds = url.searchParams.get('f')?.split('-') || [];
+	const sellerPostalCode = url.searchParams.get('seller') || '';
 
 	const state = useStore<{
 		showMenu: boolean;
-		search: SearchResponse;
+		search: any;
 		facedValues: FacetWithValues[];
 		facetValueIds: string[];
 	}>({
 		showMenu: false,
-		search: {} as SearchResponse,
-		facedValues: [],
-		facetValueIds: [],
+		search: searchLoader.value.search as any,
+		facedValues: groupFacetValues(searchLoader.value.search as any, facetIds),
+		facetValueIds: facetIds,
 	});
 
 	useTask$(async ({ track }) => {
-		track(() => searchLoader.value.query);
+		track(() => url.searchParams.toString());
 
-		const term = searchLoader.value.query.get('q') || '';
-		const activeFacetValueIds: string[] = searchLoader.value.query.get('f')?.split('-') || [];
+		const term = url.searchParams.get('q') || '';
+		const facetIds = url.searchParams.get('f')?.split('-') || [];
+		const sellerPostalCode = url.searchParams.get('seller') || '';
 
-		state.search = await executeQuery(term, activeFacetValueIds);
-		state.facedValues = groupFacetValues(state.search, activeFacetValueIds);
-		state.facetValueIds = activeFacetValueIds;
+		const search = await searchExtendedProducts({
+			term: term || undefined,
+			selectedFacets: {},
+			sellerPostalCode: sellerPostalCode || undefined,
+		});
+
+		state.search = search as any;
+		state.facedValues = groupFacetValues(search as any, facetIds);
+		state.facetValueIds = facetIds;
 	});
 
 	const onFilterChange = $(async (id: string) => {
@@ -60,7 +70,12 @@ export default component$(() => {
 		state.facetValueIds = facetValueIds;
 		changeUrlParamsWithoutRefresh(term, facetValueIds);
 
-		state.search = await executeQuery(term, state.facetValueIds);
+		const search = await searchExtendedProducts({
+			term: term || undefined,
+			selectedFacets: {},
+			sellerPostalCode: sellerPostalCode || undefined,
+		});
+		state.search = search as any;
 	});
 
 	const onOpenCloseFilter = $((id: string) => {
@@ -108,7 +123,7 @@ export default component$(() => {
 				)}
 				<div class="sm:col-span-5 lg:col-span-4">
 					<div class="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
-						{(state.search.items || []).map((item) => (
+						{(state.search.items || []).map((item: any) => (
 							<ProductCard
 								key={item.productId}
 								productAsset={item.productAsset}
