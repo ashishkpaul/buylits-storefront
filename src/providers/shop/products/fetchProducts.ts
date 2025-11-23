@@ -9,14 +9,16 @@ export async function searchExtendedProducts(params: {
 	page?: number;
 	take?: number;
 	selectedFacets?: SelectedFacets;
+	facetValueIds?: string[];
 	collectionSlug?: string;
 	sellerPostalCode?: string;
 }) {
 	const {
 		term,
 		page = 1,
-		take = 24,
+		take = 20,
 		selectedFacets = {},
+		facetValueIds,
 		collectionSlug,
 		sellerPostalCode,
 	} = params;
@@ -25,7 +27,11 @@ export async function searchExtendedProducts(params: {
 
 	// Build facet value filters - this converts { "facet1": ["fv_1", "fv_2"], "facet2": ["fv_3"] }
 	// into the format expected by Elasticsearch
-	const facetValueFilters = buildFacetValueFilters(selectedFacets);
+	// OR use simple facetValueIds array if provided
+	const facetValueFilters =
+		facetValueIds && facetValueIds.length > 0
+			? [{ or: facetValueIds }]
+			: buildFacetValueFilters(selectedFacets);
 
 	console.log('🔍 [STOREFRONT] Search params:', {
 		term,

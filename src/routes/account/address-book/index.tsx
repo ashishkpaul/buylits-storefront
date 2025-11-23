@@ -4,7 +4,7 @@ import AddressCard from '~/components/account/AddressCard';
 import { HighlightedButton } from '~/components/buttons/HighlightedButton';
 import PlusIcon from '~/components/icons/PlusIcon';
 import { APP_STATE } from '~/constants';
-import { Address } from '~/generated/graphql';
+import { Address } from '~/generated/graphql-shop';
 import {
 	deleteCustomerAddressMutation,
 	getActiveCustomerAddressesQuery,

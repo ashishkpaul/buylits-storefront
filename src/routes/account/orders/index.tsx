@@ -1,6 +1,6 @@
 import { component$, useSignal, useVisibleTask$ } from '@qwik.dev/core';
 import OrderCard from '~/components/account/OrderCard';
-import { Customer, Order } from '~/generated/graphql';
+import { Customer, Order } from '~/generated/graphql-shop';
 import { getActiveCustomerOrdersQuery } from '~/providers/shop/customer/customer';
 
 export default component$(() => {

@@ -6,27 +6,34 @@ import FiltersButton from '~/components/filters-button/FiltersButton';
 import ProductCard from '~/components/products/ProductCard';
 import { SearchResponse } from '~/generated/graphql-shop';
 import { groupFacetValues } from '~/utils';
+import { useInfiniteScroll } from '~/hooks/useInfiniteScroll';
 
 export const useSearchLoader = routeLoader$(async ({ query }) => {
 	const term = query.get('q') || '';
-	const facetParams = query.get('f')?.split('-') || [];
+	const facetParams =
+		query
+			.get('f')
+			?.split('-')
+			.filter((f) => f.length > 0) || [];
 	const sellerPostalCode = query.get('seller') || '';
-
-	// Parse facetIds into facet filters grouped by facet code
-	// This is KEY - we need to map individual facet value IDs to their facet groups
-	const selectedFacets: Record<string, string[]> = {};
-
-	// For now, collect all facet IDs under a generic key
-	// In production, you'd need the mapping of facetId -> facetCode
-	if (facetParams.length > 0) {
-		selectedFacets['facets'] = facetParams;
-	}
 
 	const search = await searchExtendedProducts({
 		term: term || undefined,
-		selectedFacets,
+		facetValueIds: facetParams,
 		sellerPostalCode: sellerPostalCode || undefined,
 	});
+
+	if (term) {
+		console.log('🔍 [SEARCH-LOADER] Search results for term:', term);
+		console.log('🔍 [SEARCH-LOADER] Total items:', search?.totalItems);
+		console.log(
+			'🔍 [SEARCH-LOADER] Products returned:',
+			search?.items?.map((item: any) => ({
+				name: item.productName,
+				facetValueIds: item.facetValueIds,
+			}))
+		);
+	}
 
 	return {
 		search,
@@ -41,74 +48,112 @@ export default component$(() => {
 	const searchLoader = useSearchLoader();
 
 	const term = url.searchParams.get('q') || '';
-	const facetParams = url.searchParams.get('f')?.split('-') || [];
+	const facetParams =
+		url.searchParams
+			.get('f')
+			?.split('-')
+			.filter((f) => f.length > 0) || [];
 	const sellerPostalCode = url.searchParams.get('seller') || '';
 
 	const state = useStore<{
 		showMenu: boolean;
 		search: SearchResponse;
 		facedValues: any[];
-		facetValueIds: Set<string>;
-		selectedFacetValueIds: Map<string, Set<string>>;
+		facetValueIds: string[];
 	}>({
 		showMenu: false,
 		search: searchLoader.value.search as SearchResponse,
 		facedValues: groupFacetValues(searchLoader.value.search as any, facetParams),
-		facetValueIds: new Set(facetParams),
-		selectedFacetValueIds: new Map(), // Track by facet code
+		facetValueIds: facetParams,
+	}); // Infinite scroll hook initialization
+	const infiniteScroll = useInfiniteScroll({
+		initialItems: searchLoader.value.search.items || [],
+		pageSize: 20,
+		loadMore$: $(async (page: number) => {
+			const search = await searchExtendedProducts({
+				term: term || undefined,
+				page,
+				take: 20,
+				facetValueIds: state.facetValueIds,
+				sellerPostalCode: sellerPostalCode || undefined,
+			});
+			return search.items || [];
+		}),
 	});
+
+	// Destructure signals to avoid referencing non-serializable functions on the container object inside tasks
+	const {
+		items: infItems,
+		page: infPage,
+		hasMore: infHasMore,
+		error: infError,
+		sentinelRef,
+	} = infiniteScroll;
 
 	useTask$(async ({ track }) => {
 		track(() => url.searchParams.toString());
 
 		const term = url.searchParams.get('q') || '';
-		const facetParams = url.searchParams.get('f')?.split('-') || [];
+		const facetParams =
+			url.searchParams
+				.get('f')
+				?.split('-')
+				.filter((f) => f.length > 0) || [];
 		const sellerPostalCode = url.searchParams.get('seller') || '';
-
-		// Build facet filters grouped by facet code
-		const selectedFacets: Record<string, string[]> = {};
-
-		// Map facet value IDs to their parent facet codes
-		const facetValues = searchLoader.value.search.facetValues || [];
-		facetParams.forEach((facetValueId) => {
-			const facetValue = facetValues.find((fv: any) => fv.facetValue?.id === facetValueId);
-			if (facetValue) {
-				const facetCode = facetValue.facetValue?.facet?.id || 'facet';
-				if (!selectedFacets[facetCode]) {
-					selectedFacets[facetCode] = [];
-				}
-				selectedFacets[facetCode].push(facetValueId);
-			}
-		});
 
 		const search = await searchExtendedProducts({
 			term: term || undefined,
-			selectedFacets: Object.keys(selectedFacets).length > 0 ? selectedFacets : undefined,
+			page: 1,
+			take: 20,
+			facetValueIds: facetParams,
 			sellerPostalCode: sellerPostalCode || undefined,
 		});
 
 		state.search = search as SearchResponse;
 		state.facedValues = groupFacetValues(search as any, facetParams);
-		state.facetValueIds = new Set(facetParams);
+		state.facetValueIds = facetParams;
+		// Reinitialize infinite scroll manually (avoid non-serializable function reference)
+		infPage.value = 1;
+		infHasMore.value = true;
+		infError.value = null;
+		infItems.value = search.items || [];
 	});
 
 	const onFilterChange = $(async (facetValueId: string) => {
-		const newFacetIds = new Set(state.facetValueIds);
-		if (newFacetIds.has(facetValueId)) {
-			newFacetIds.delete(facetValueId);
-		} else {
-			newFacetIds.add(facetValueId);
-		}
+		const newFacetIds = state.facetValueIds.includes(facetValueId)
+			? state.facetValueIds.filter((f) => f !== facetValueId)
+			: [...state.facetValueIds, facetValueId];
 
 		const params = new URLSearchParams();
-		if (term) params.set('q', term);
-		if (newFacetIds.size > 0) {
-			params.set('f', Array.from(newFacetIds).join('-'));
+		const currentTerm = url.searchParams.get('q') || '';
+		const currentSeller = url.searchParams.get('seller') || '';
+
+		if (currentTerm) params.set('q', currentTerm);
+		if (newFacetIds.length > 0) {
+			params.set('f', newFacetIds.join('-'));
 		}
-		if (sellerPostalCode) params.set('seller', sellerPostalCode);
+		if (currentSeller) params.set('seller', currentSeller);
 
 		window.history.pushState(null, '', `?${params.toString()}`);
+
+		// Fetch new search results with updated filters
+		const search = await searchExtendedProducts({
+			term: currentTerm || undefined,
+			page: 1,
+			take: 20,
+			facetValueIds: newFacetIds,
+			sellerPostalCode: currentSeller || undefined,
+		});
+
 		state.facetValueIds = newFacetIds;
+		state.search = search as SearchResponse;
+		state.facedValues = groupFacetValues(search as any, newFacetIds);
+
+		// Reset infinite scroll
+		infPage.value = 1;
+		infHasMore.value = true;
+		infError.value = null;
+		infItems.value = search.items || [];
 	});
 
 	const onOpenCloseFilter = $((facetId: string) => {
@@ -123,7 +168,9 @@ export default component$(() => {
 	return (
 		<div class="max-w-6xl mx-auto px-4 py-10">
 			<div class="flex justify-between items-center">
-				<h1 class="text-2xl font-bold">{term ? `Search: ${term}` : 'All Products'}</h1>
+				<h1 class="text-2xl font-bold">
+					{url.searchParams.get('q') ? `Search: ${url.searchParams.get('q')}` : 'All Products'}
+				</h1>
 				<FiltersButton
 					onToggleMenu$={$(() => {
 						state.showMenu = !state.showMenu;
@@ -147,12 +194,12 @@ export default component$(() => {
 				<div class="col-span-3">
 					<p class="text-sm text-gray-500 mb-4">
 						{state.search.totalItems} results
-						{state.facetValueIds.size > 0 && ` (${state.facetValueIds.size} filters applied)`}
+						{state.facetValueIds.length > 0 && ` (${state.facetValueIds.length} filters applied)`}
 					</p>
 
-					{state.search.items && state.search.items.length > 0 ? (
+					{infItems.value && infItems.value.length > 0 ? (
 						<div class="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
-							{state.search.items.map((item) => (
+							{infItems.value.map((item: any) => (
 								<ProductCard
 									key={item.productId}
 									productAsset={item.productAsset}
@@ -167,6 +214,21 @@ export default component$(() => {
 					) : (
 						<div class="text-center py-12">
 							<p class="text-gray-500">No products found matching your filters.</p>
+						</div>
+					)}
+					<div ref={(el) => (sentinelRef.value = el)} class="h-8"></div>
+					{infiniteScroll.isLoading.value && (
+						<div class="flex justify-center items-center py-6">
+							<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+							<span class="ml-2 text-gray-600">Loading more...</span>
+						</div>
+					)}
+					{!infHasMore.value && infItems.value.length > 0 && (
+						<div class="text-center py-6 text-gray-500">No more products.</div>
+					)}
+					{infError.value && (
+						<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+							{infError.value}
 						</div>
 					)}
 				</div>

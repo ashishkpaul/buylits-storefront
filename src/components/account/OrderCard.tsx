@@ -1,7 +1,7 @@
 import { component$ } from '@qwik.dev/core';
 import { useNavigate } from '@qwik.dev/router';
 import { HighlightedButton } from '~/components/buttons/HighlightedButton';
-import { Order } from '~/generated/graphql';
+import { Order } from '~/generated/graphql-shop';
 import { formatPrice } from '~/utils';
 import { Image } from '../image/image';
 

@@ -1,5 +1,5 @@
 import { component$ } from '@qwik.dev/core';
-import { Collection } from '~/generated/graphql';
+import { Collection } from '~/generated/graphql-shop';
 import { Image } from '../image/image';
 
 interface IProps {

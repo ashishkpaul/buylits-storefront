@@ -32,6 +32,7 @@ export default component$(() => {
 		}, 300);
 	});
 
+	// Generic search navigation for plain text terms
 	const handleSearch = $((term: string) => {
 		if (term.trim()) {
 			navigate(`/search?q=${encodeURIComponent(term)}`);
@@ -40,14 +41,31 @@ export default component$(() => {
 		}
 	});
 
+	// Specialized handler for suggestion objects
+	const handleSuggestionSelect = $((s: any) => {
+		// CATEGORY suggestions should navigate to the collection page
+		if (s.type === 'CATEGORY' && s.categorySlug) {
+			navigate(`/collections/${encodeURIComponent(s.categorySlug)}`);
+			showSuggestions.value = false;
+			searchTerm.value = '';
+			return;
+		}
+		// PRODUCT / COMPLETION / BRAND fallback to search by text
+		handleSearch(s.text);
+	});
+
+	const handleSubmit = $((e: Event) => {
+		e.preventDefault();
+		handleSearch(searchTerm.value);
+	});
+
 	return (
-		<form action="/search" class="relative">
+		<form action="/search" class="relative" onSubmit$={handleSubmit}>
 			<input
 				type="search"
 				name="q"
 				value={searchTerm.value}
 				onInput$={(_, el) => (searchTerm.value = el.value)}
-				onKeyDown$={(e) => e.key === 'Enter' && handleSearch(searchTerm.value)}
 				placeholder={_`Search`}
 				autoComplete="off"
 				class="block w-full rounded-md border-gray-300"
@@ -59,13 +77,21 @@ export default component$(() => {
 						<li key={idx}>
 							<button
 								type="button"
-								onClick$={() => handleSearch(s.text)}
-								class="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
+								onClick$={() => handleSuggestionSelect(s)}
+								class="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm flex justify-between items-center"
 							>
-								{s.highlighted || s.text}
-								{s.productCount && (
-									<span class="text-gray-400 text-xs ml-2">({s.productCount})</span>
-								)}
+								<span>
+									{s.highlighted || s.text}
+									{s.productCount && (
+										<span class="text-gray-400 text-xs ml-2">({s.productCount})</span>
+									)}
+								</span>
+								<span class="text-[10px] uppercase tracking-wide text-gray-400 ml-2">
+									{s.type === 'CATEGORY' && 'Category'}
+									{s.type === 'PRODUCT' && 'Product'}
+									{s.type === 'BRAND' && 'Brand'}
+									{s.type === 'COMPLETION' && 'Suggestion'}
+								</span>
 							</button>
 						</li>
 					))}

@@ -7,7 +7,7 @@ import ChevronRightIcon from '~/components/icons/ChevronRightIcon';
 import Payment from '~/components/payment/Payment';
 import Shipping from '~/components/shipping/Shipping';
 import { APP_STATE, CUSTOMER_NOT_DEFINED_ID } from '~/constants';
-import { CreateAddressInput, CreateCustomerInput } from '~/generated/graphql';
+import { CreateAddressInput, CreateCustomerInput } from '~/generated/graphql-shop';
 import {
 	addPaymentToOrderMutation,
 	transitionOrderToStateMutation,

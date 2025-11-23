@@ -43,15 +43,19 @@ export default component$<{
 								<div class="pt-6">
 									<div class="space-y-4">
 										{facet.values.map((value) => (
-											<div key={value.id} class="flex items-center cursor-pointer">
-												<label class="text-sm text-gray-600">
-													<input
-														class="h-4 w-4 border-gray-300 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
-														type="checkbox"
-														checked={value.selected}
-														onClick$={() => onFilterChange$(value.id)}
-													/>
-													<span class="ml-3">{value.name}</span>
+											<div key={value.id} class="flex items-center">
+												<input
+													id={`filter-${value.id}`}
+													class="h-4 w-4 border-gray-300 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
+													type="checkbox"
+													checked={value.selected}
+													onChange$={$(() => onFilterChange$(value.id))}
+												/>
+												<label
+													for={`filter-${value.id}`}
+													class="ml-3 text-sm text-gray-600 cursor-pointer"
+												>
+													{value.name}
 												</label>
 											</div>
 										))}
@@ -102,14 +106,25 @@ export default component$<{
 												<div class="pt-6">
 													<div class="space-y-6">
 														{facet.values.map((value) => (
-															<div key={value.id} class="flex items-center cursor-pointer">
+															<div key={value.id} class="flex items-center">
 																<input
+																	id={`filter-mobile-${value.id}`}
 																	class="h-4 w-4 border-gray-300 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
 																	type="checkbox"
 																	checked={value.selected}
-																	onClick$={() => onFilterChange$(value.id)}
+																	onChange$={$(() => {
+																		console.log(
+																			'🔍 [FILTER-MOBILE] Checkbox changed for:',
+																			value.id,
+																			value.name
+																		);
+																		onFilterChange$(value.id);
+																	})}
 																/>
-																<label class="ml-3 min-w-0 flex-1 text-gray-500">
+																<label
+																	for={`filter-mobile-${value.id}`}
+																	class="ml-3 min-w-0 flex-1 text-gray-500 cursor-pointer"
+																>
 																	{value.name}
 																</label>
 															</div>

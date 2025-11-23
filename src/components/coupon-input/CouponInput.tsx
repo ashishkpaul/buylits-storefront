@@ -1,7 +1,7 @@
 import { _ } from 'compiled-i18n';
 import { $, component$, useContext, useSignal } from '@qwik.dev/core';
 import { APP_STATE } from '~/constants';
-import { Order } from '~/generated/graphql';
+import { Order } from '~/generated/graphql-shop';
 import { applyCouponCodeMutation } from '~/providers/shop/orders/order';
 import Alert from '../alert/Alert';
 import Success from '../success/Success';

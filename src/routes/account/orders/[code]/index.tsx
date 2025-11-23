@@ -1,7 +1,7 @@
 import { component$, useStore, useVisibleTask$ } from '@qwik.dev/core';
 import { useLocation } from '@qwik.dev/router';
 import { Image } from '~/components/image/image';
-import { Order } from '~/generated/graphql';
+import { Order } from '~/generated/graphql-shop';
 import { getOrderByCodeQuery } from '~/providers/shop/orders/order';
 import { formatDateTime, formatPrice } from '~/utils';
 

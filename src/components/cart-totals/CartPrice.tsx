@@ -1,5 +1,5 @@
 import { component$ } from '@qwik.dev/core';
-import { Order } from '~/generated/graphql';
+import { Order } from '~/generated/graphql-shop';
 import type { OrderPriceFields } from '~/types';
 import { formatPrice } from '~/utils';
 

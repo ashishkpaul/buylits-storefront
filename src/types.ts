@@ -1,4 +1,4 @@
-import { Collection as CollectionGql, Order } from '~/generated/graphql';
+import { Collection as CollectionGql, Order } from '~/generated/graphql-shop';
 
 export type AppState = {
 	collections: CollectionGql[];

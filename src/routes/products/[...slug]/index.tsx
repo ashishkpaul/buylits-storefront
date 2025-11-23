@@ -10,7 +10,7 @@ import Price from '~/components/products/Price';
 import StockLevelLabel from '~/components/stock-level-label/StockLevelLabel';
 import TopReviews from '~/components/top-reviews/TopReviews';
 import { APP_STATE } from '~/constants';
-import { Order, OrderLine } from '~/generated/graphql';
+import { Order, OrderLine } from '~/generated/graphql-shop';
 import { addItemToOrderMutation } from '~/providers/shop/orders/order';
 import { getProductBySlug } from '~/providers/shop/products/products';
 import { Variant } from '~/types';

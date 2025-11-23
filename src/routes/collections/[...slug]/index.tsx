@@ -5,7 +5,7 @@ import CollectionCard from '~/components/collection-card/CollectionCard';
 import Filters from '~/components/facet-filter-controls/Filters';
 import FiltersButton from '~/components/filters-button/FiltersButton';
 import ProductCard from '~/components/products/ProductCard';
-import { SearchResponse } from '~/generated/graphql';
+import { SearchResponse } from '~/generated/graphql-shop';
 import { getCollectionBySlug } from '~/providers/shop/collections/collections';
 import {
 	searchQueryWithCollectionSlug,
@@ -19,6 +19,7 @@ import {
 	generateDocumentHead,
 	groupFacetValues,
 } from '~/utils';
+import { useInfiniteScroll } from '~/hooks/useInfiniteScroll';
 
 export const useCollectionLoader = routeLoader$(async ({ params }) => {
 	return await getCollectionBySlug(params.slug);
@@ -52,14 +53,40 @@ export default component$(() => {
 		facetValueIds: activeFacetValueIds,
 	});
 
+	// Infinite scroll hook for collections
+	const infiniteScroll = useInfiniteScroll({
+		initialItems: searchSignal.value.items || [],
+		pageSize: 20,
+		loadMore$: $(async (page: number) => {
+			const search = state.facetValueIds.length
+				? await searchQueryWithTerm(params.slug, '', state.facetValueIds, 20, (page - 1) * 20)
+				: await searchQueryWithCollectionSlug(params.slug, 20, (page - 1) * 20);
+			return search.items || [];
+		}),
+	});
+
+	// Destructure signals to avoid lexical scope issues
+	const {
+		items: infItems,
+		page: infPage,
+		hasMore: infHasMore,
+		error: infError,
+		sentinelRef,
+	} = infiniteScroll;
+
 	useTask$(async ({ track }) => {
 		track(() => collectionSignal.value.slug);
 		params.slug = cleanUpParams(p).slug;
 		state.facetValueIds = url.searchParams.get('f')?.split('-') || [];
 		state.search = state.facetValueIds.length
-			? await searchQueryWithTerm(params.slug, '', state.facetValueIds)
-			: await searchQueryWithCollectionSlug(params.slug);
+			? await searchQueryWithTerm(params.slug, '', state.facetValueIds, 20, 0)
+			: await searchQueryWithCollectionSlug(params.slug, 20, 0);
 		state.facedValues = groupFacetValues(state.search as SearchResponse, state.facetValueIds);
+		// Reset infinite scroll on collection/filter change
+		infPage.value = 1;
+		infHasMore.value = true;
+		infError.value = null;
+		infItems.value = state.search.items || [];
 	});
 
 	const onFilterChange = $(async (id: string) => {
@@ -74,8 +101,13 @@ export default component$(() => {
 		changeUrlParamsWithoutRefresh('', facetValueIds);
 
 		state.search = facetValueIds.length
-			? await searchQueryWithTerm(params.slug, '', state.facetValueIds)
-			: await searchQueryWithCollectionSlug(params.slug);
+			? await searchQueryWithTerm(params.slug, '', state.facetValueIds, 20, 0)
+			: await searchQueryWithCollectionSlug(params.slug, 20, 0);
+		// Reset infinite scroll on filter change
+		infPage.value = 1;
+		infHasMore.value = true;
+		infError.value = null;
+		infItems.value = state.search.items || [];
 	});
 
 	const onOpenCloseFilter = $((id: string) => {
@@ -137,7 +169,7 @@ export default component$(() => {
 				)}
 				<div class="sm:col-span-5 lg:col-span-4">
 					<div class="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
-						{state.search.items.map((item) => (
+						{infItems.value.map((item: any) => (
 							<ProductCard
 								key={item.productId}
 								productAsset={item.productAsset}
@@ -148,6 +180,25 @@ export default component$(() => {
 							></ProductCard>
 						))}
 					</div>
+					{/* Sentinel for infinite scroll */}
+					<div ref={(el) => (sentinelRef.value = el)} class="h-8"></div>
+					{/* Loading indicator */}
+					{infiniteScroll.isLoading.value && (
+						<div class="flex justify-center items-center py-6">
+							<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+							<span class="ml-2 text-gray-600">Loading more...</span>
+						</div>
+					)}
+					{/* End of results */}
+					{!infHasMore.value && infItems.value.length > 0 && (
+						<div class="text-center py-6 text-gray-500">No more products.</div>
+					)}
+					{/* Error message */}
+					{infError.value && (
+						<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+							{infError.value}
+						</div>
+					)}
 				</div>
 			</div>
 		</div>

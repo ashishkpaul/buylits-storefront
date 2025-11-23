@@ -11,7 +11,7 @@ import {
 	SetCustomerForOrderMutation,
 	SetOrderShippingAddressMutation,
 	SetOrderShippingMethodMutation,
-} from '~/generated/graphql';
+} from '~/generated/graphql-shop';
 import { ApplyCouponCodeMutation, RemoveCouponCodeMutation } from '~/generated/graphql-shop';
 import { shopSdk } from '~/graphql-wrapper';
 

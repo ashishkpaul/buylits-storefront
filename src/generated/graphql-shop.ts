@@ -4281,12 +4281,13 @@ export type CollectionsQuery = {
 	__typename?: 'Query';
 	collections: {
 		__typename?: 'CollectionList';
+		totalItems: number;
 		items: Array<{
 			__typename?: 'Collection';
 			id: string;
 			name: string;
 			slug: string;
-			parent?: { __typename?: 'Collection'; name: string } | null;
+			parent?: { __typename?: 'Collection'; id: string; slug: string; name: string } | null;
 			featuredAsset?: { __typename?: 'Asset'; id: string; preview: string } | null;
 		}>;
 	};
@@ -6140,6 +6141,8 @@ export const CollectionsDocument = gql`
 				name
 				slug
 				parent {
+					id
+					slug
 					name
 				}
 				featuredAsset {
@@ -6147,6 +6150,7 @@ export const CollectionsDocument = gql`
 					preview
 				}
 			}
+			totalItems
 		}
 	}
 `;

@@ -12,7 +12,7 @@ import { guessLocale } from 'compiled-i18n';
 import { ImageTransformerProps, useImageProvider } from '~/components/image/image';
 import Menu from '~/components/menu/Menu';
 import { APP_STATE, CUSTOMER_NOT_DEFINED_ID, IMAGE_RESOLUTIONS } from '~/constants';
-import { Order } from '~/generated/graphql';
+import { Order } from '~/generated/graphql-shop';
 import { getAvailableCountriesQuery } from '~/providers/shop/checkout/checkout';
 import { getCollections } from '~/providers/shop/collections/collections';
 import { getActiveOrderQuery } from '~/providers/shop/orders/order';

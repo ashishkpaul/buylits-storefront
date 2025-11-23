@@ -5,7 +5,7 @@ import {
 	DEFAULT_METADATA_URL,
 } from '~/constants';
 import { ENV_VARIABLES } from '~/env';
-import { SearchResponse } from '~/generated/graphql';
+import { SearchResponse } from '~/generated/graphql-shop';
 import { ActiveCustomer, FacetWithValues, ShippingAddress } from '~/types';
 
 export const getRandomInt = (max: number) => Math.floor(Math.random() * max);
@@ -24,14 +24,43 @@ export const groupFacetValues = (
 	if (!search) {
 		return [];
 	}
+
+	console.log('🔍 [GROUP-FACETS] Total items in search:', search.totalItems);
+	console.log('🔍 [GROUP-FACETS] Total facet values received:', search.facetValues?.length);
+	console.log('🔍 [GROUP-FACETS] Active facet IDs:', activeFacetValueIds);
+
 	const facetMap = new Map<string, FacetWithValues>();
+	let skippedAll = 0;
+	let skippedZero = 0;
+	let included = 0;
+
 	for (const {
 		facetValue: { id, name, facet },
 		count,
 	} of search.facetValues) {
+		console.log('🔍 [GROUP-FACETS] Processing:', {
+			facetName: facet.name,
+			valueName: name,
+			count,
+			totalItems: search.totalItems,
+		});
+
+		// Skip facets that apply to all items (not useful for filtering)
 		if (count === search.totalItems) {
+			console.log('  ❌ Skipped (applies to all items)');
+			skippedAll++;
 			continue;
 		}
+		// Skip facets that don't appear in any search results
+		if (count === 0) {
+			console.log('  ❌ Skipped (count is 0)');
+			skippedZero++;
+			continue;
+		}
+
+		console.log('  ✅ Included');
+		included++;
+
 		const facetFromMap = facetMap.get(facet.id);
 		const selected = (activeFacetValueIds || []).includes(id);
 		if (facetFromMap) {
@@ -45,7 +74,17 @@ export const groupFacetValues = (
 			});
 		}
 	}
-	return Array.from(facetMap.values());
+
+	const result = Array.from(facetMap.values());
+	console.log('🔍 [GROUP-FACETS] Summary:', {
+		skippedAll,
+		skippedZero,
+		included,
+		facetGroups: result.length,
+		facetGroupNames: result.map((f) => f.name),
+	});
+
+	return result;
 };
 
 export const enableDisableFacetValues = (_facedValues: FacetWithValues[], ids: string[]) => {

@@ -1,4 +1,4 @@
-// import { getSdk, type LogicalOperator } from '~/generated/graphql';
+// import { getSdk, type LogicalOperator } from '~/generated/graphql-shop';
 import { getSdk as getShopSdk, type LogicalOperator } from '~/generated/graphql-shop';
 import { requester } from '~/utils/api';
 
