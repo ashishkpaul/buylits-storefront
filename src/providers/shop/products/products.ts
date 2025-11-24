@@ -11,16 +11,26 @@ export const search = async (searchInput: SearchInput) => {
 export const searchQueryWithCollectionSlug = async (
 	collectionSlug: string,
 	take: number = 20,
-	skip: number = 0
-) => search({ collectionSlug, take, skip });
+	skip: number = 0,
+	sellerPostalCode?: string
+) => search({ collectionSlug, take, skip, ...(sellerPostalCode && { sellerPostalCode }) });
 
 export const searchQueryWithTerm = async (
 	collectionSlug: string,
 	term: string,
 	facetValueIds: string[],
 	take: number = 20,
-	skip: number = 0
-) => search({ collectionSlug, term, facetValueFilters: [{ or: facetValueIds }], take, skip });
+	skip: number = 0,
+	sellerPostalCode?: string
+) =>
+	search({
+		collectionSlug,
+		term,
+		facetValueFilters: [{ or: facetValueIds }],
+		take,
+		skip,
+		...(sellerPostalCode && { sellerPostalCode }),
+	});
 
 export const getProductBySlug = async (slug: string) => {
 	return shopSdk.product({ slug }).then((res: ProductQuery) => res.product as Product);

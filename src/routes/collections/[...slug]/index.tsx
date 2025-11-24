@@ -1,11 +1,13 @@
-import { $, component$, useStore, useTask$ } from '@qwik.dev/core';
+import { $, component$, useContext, useStore, useTask$ } from '@qwik.dev/core';
 import { DocumentHead, routeLoader$, useLocation } from '@qwik.dev/router';
 import Breadcrumbs from '~/components/breadcrumbs/Breadcrumbs';
 import CollectionCard from '~/components/collection-card/CollectionCard';
 import Filters from '~/components/facet-filter-controls/Filters';
 import FiltersButton from '~/components/filters-button/FiltersButton';
 import ProductCard from '~/components/products/ProductCard';
+import { APP_STATE } from '~/constants';
 import { SearchResponse } from '~/generated/graphql-shop';
+import { useInfiniteScroll } from '~/hooks/useInfiniteScroll';
 import { getCollectionBySlug } from '~/providers/shop/collections/collections';
 import {
 	searchQueryWithCollectionSlug,
@@ -19,7 +21,7 @@ import {
 	generateDocumentHead,
 	groupFacetValues,
 } from '~/utils';
-import { useInfiniteScroll } from '~/hooks/useInfiniteScroll';
+import { getActiveCustomerPostalCode } from '~/utils/customer-postal-code';
 
 export const useCollectionLoader = routeLoader$(async ({ params }) => {
 	return await getCollectionBySlug(params.slug);
@@ -40,6 +42,10 @@ export default component$(() => {
 
 	const collectionSignal = useCollectionLoader();
 	const searchSignal = useSearchLoader();
+	const appState = useContext(APP_STATE);
+
+	// Auto-derive customer postal code for local filtering
+	const customerPostalCode = getActiveCustomerPostalCode(appState);
 
 	const state = useStore<{
 		showMenu: boolean;
@@ -59,8 +65,20 @@ export default component$(() => {
 		pageSize: 20,
 		loadMore$: $(async (page: number) => {
 			const search = state.facetValueIds.length
-				? await searchQueryWithTerm(params.slug, '', state.facetValueIds, 20, (page - 1) * 20)
-				: await searchQueryWithCollectionSlug(params.slug, 20, (page - 1) * 20);
+				? await searchQueryWithTerm(
+						params.slug,
+						'',
+						state.facetValueIds,
+						20,
+						(page - 1) * 20,
+						customerPostalCode || undefined
+					)
+				: await searchQueryWithCollectionSlug(
+						params.slug,
+						20,
+						(page - 1) * 20,
+						customerPostalCode || undefined
+					);
 			return search.items || [];
 		}),
 	});
@@ -79,8 +97,15 @@ export default component$(() => {
 		params.slug = cleanUpParams(p).slug;
 		state.facetValueIds = url.searchParams.get('f')?.split('-') || [];
 		state.search = state.facetValueIds.length
-			? await searchQueryWithTerm(params.slug, '', state.facetValueIds, 20, 0)
-			: await searchQueryWithCollectionSlug(params.slug, 20, 0);
+			? await searchQueryWithTerm(
+					params.slug,
+					'',
+					state.facetValueIds,
+					20,
+					0,
+					customerPostalCode || undefined
+				)
+			: await searchQueryWithCollectionSlug(params.slug, 20, 0, customerPostalCode || undefined);
 		state.facedValues = groupFacetValues(state.search as SearchResponse, state.facetValueIds);
 		// Reset infinite scroll on collection/filter change
 		infPage.value = 1;
@@ -101,8 +126,15 @@ export default component$(() => {
 		changeUrlParamsWithoutRefresh('', facetValueIds);
 
 		state.search = facetValueIds.length
-			? await searchQueryWithTerm(params.slug, '', state.facetValueIds, 20, 0)
-			: await searchQueryWithCollectionSlug(params.slug, 20, 0);
+			? await searchQueryWithTerm(
+					params.slug,
+					'',
+					state.facetValueIds,
+					20,
+					0,
+					customerPostalCode || undefined
+				)
+			: await searchQueryWithCollectionSlug(params.slug, 20, 0, customerPostalCode || undefined);
 		// Reset infinite scroll on filter change
 		infPage.value = 1;
 		infHasMore.value = true;

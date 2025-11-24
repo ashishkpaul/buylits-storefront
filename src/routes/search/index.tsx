@@ -1,12 +1,14 @@
-import { $, component$, useStore, useTask$ } from '@qwik.dev/core';
+import { $, component$, useContext, useStore, useTask$ } from '@qwik.dev/core';
 import { routeLoader$, useLocation } from '@qwik.dev/router';
-import { searchExtendedProducts } from '~/providers/shop/products/fetchProducts';
 import Filters from '~/components/facet-filter-controls/Filters';
 import FiltersButton from '~/components/filters-button/FiltersButton';
 import ProductCard from '~/components/products/ProductCard';
+import { APP_STATE } from '~/constants';
 import { SearchResponse } from '~/generated/graphql-shop';
-import { groupFacetValues } from '~/utils';
 import { useInfiniteScroll } from '~/hooks/useInfiniteScroll';
+import { searchExtendedProducts } from '~/providers/shop/products/fetchProducts';
+import { groupFacetValues } from '~/utils';
+import { getActiveCustomerPostalCode } from '~/utils/customer-postal-code';
 
 export const useSearchLoader = routeLoader$(async ({ query }) => {
 	const term = query.get('q') || '';
@@ -40,6 +42,10 @@ export const useSearchLoader = routeLoader$(async ({ query }) => {
 export default component$(() => {
 	const { url } = useLocation();
 	const searchLoader = useSearchLoader();
+	const appState = useContext(APP_STATE);
+
+	// Auto-derive customer postal code for local filtering
+	const customerPostalCode = getActiveCustomerPostalCode(appState);
 
 	const term = url.searchParams.get('q') || '';
 	const facetParams =
@@ -47,7 +53,8 @@ export default component$(() => {
 			.get('f')
 			?.split('-')
 			.filter((f) => f.length > 0) || [];
-	const sellerPostalCode = url.searchParams.get('seller') || '';
+	// Use customer postal code if available, otherwise use URL param
+	const sellerPostalCode = customerPostalCode || url.searchParams.get('seller') || '';
 
 	const state = useStore<{
 		showMenu: boolean;
