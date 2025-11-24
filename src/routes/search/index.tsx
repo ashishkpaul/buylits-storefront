@@ -46,6 +46,7 @@ export default component$(() => {
 
 	// Auto-derive customer postal code for local filtering
 	const customerPostalCode = getActiveCustomerPostalCode(appState);
+	console.log('🔍 [SEARCH] Customer postal code derived:', customerPostalCode);
 
 	const term = url.searchParams.get('q') || '';
 	const facetParams =
@@ -55,6 +56,7 @@ export default component$(() => {
 			.filter((f) => f.length > 0) || [];
 	// Use customer postal code if available, otherwise use URL param
 	const sellerPostalCode = customerPostalCode || url.searchParams.get('seller') || '';
+	console.log('🔍 [SEARCH] Final sellerPostalCode for query:', sellerPostalCode);
 
 	const state = useStore<{
 		showMenu: boolean;

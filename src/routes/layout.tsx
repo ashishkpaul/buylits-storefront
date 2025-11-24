@@ -15,8 +15,8 @@ import { APP_STATE, CUSTOMER_NOT_DEFINED_ID, IMAGE_RESOLUTIONS } from '~/constan
 import { Address, Order } from '~/generated/graphql-shop';
 import { getAvailableCountriesQuery } from '~/providers/shop/checkout/checkout';
 import { getCollections } from '~/providers/shop/collections/collections';
-import { getActiveOrderQuery } from '~/providers/shop/orders/order';
 import { getActiveCustomerAddressesQuery } from '~/providers/shop/customer/customer';
+import { getActiveOrderQuery } from '~/providers/shop/orders/order';
 import { ActiveCustomer, AppState, ShippingAddress } from '~/types';
 import Cart from '../components/cart/Cart';
 import Footer from '../components/footer/footer';
@@ -82,15 +82,30 @@ export default component$(() => {
 	useContextProvider(APP_STATE, state);
 
 	useVisibleTask$(async () => {
+		console.log('🔄 [LAYOUT] Loading active order and customer addresses...');
 		state.activeOrder = await getActiveOrderQuery();
+		console.log('✅ [LAYOUT] Active order loaded');
 
 		// Load customer addresses for postal code filtering
 		try {
+			console.log('🔄 [LAYOUT] Fetching customer addresses...');
 			const activeCustomer = await getActiveCustomerAddressesQuery();
+			console.log('📦 [LAYOUT] Customer query result:', {
+				hasCustomer: !!activeCustomer,
+				hasAddresses: !!activeCustomer?.addresses,
+				addressCount: activeCustomer?.addresses?.length || 0,
+			});
+
 			if (activeCustomer?.addresses) {
 				const shippingAddresses: ShippingAddress[] = (activeCustomer.addresses as Address[]).map(
-					(address: Address) =>
-						({
+					(address: Address) => {
+						console.log('📍 [LAYOUT] Processing address:', {
+							id: address.id,
+							postalCode: address.postalCode,
+							defaultShipping: address.defaultShippingAddress,
+							defaultBilling: address.defaultBillingAddress,
+						});
+						return {
 							id: address.id,
 							fullName: address.fullName,
 							streetLine1: address.streetLine1,
@@ -103,13 +118,20 @@ export default component$(() => {
 							phoneNumber: address.phoneNumber,
 							defaultShippingAddress: address.defaultShippingAddress,
 							defaultBillingAddress: address.defaultBillingAddress,
-						}) as ShippingAddress
+						} as ShippingAddress;
+					}
 				);
 				state.addressBook = shippingAddresses;
+				console.log('✅ [LAYOUT] Address book populated:', {
+					count: state.addressBook.length,
+					postalCodes: state.addressBook.map((a) => a.postalCode),
+				});
+			} else {
+				console.log('⚠️ [LAYOUT] No addresses found for customer');
 			}
 		} catch (error) {
 			// Customer not logged in or error fetching addresses
-			console.debug('Could not load customer addresses:', error);
+			console.log('❌ [LAYOUT] Could not load customer addresses:', error);
 		}
 	});
 

@@ -46,6 +46,11 @@ export default component$(() => {
 
 	// Auto-derive customer postal code for local filtering
 	const customerPostalCode = getActiveCustomerPostalCode(appState);
+	console.log('🏪 [COLLECTION] Customer postal code derived:', customerPostalCode);
+	console.log(
+		'🏪 [COLLECTION] Will filter products by sellerPostalCode:',
+		customerPostalCode || 'NONE'
+	);
 
 	const state = useStore<{
 		showMenu: boolean;
