@@ -69,3 +69,20 @@ export async function searchExtendedProducts(params: {
 		throw error;
 	}
 }
+
+// Wrapper to automatically inject customer postal code from appState
+export function searchExtendedWithCustomerPostalCode(
+	appState: any,
+	params: {
+		term?: string;
+		page?: number;
+		take?: number;
+		selectedFacets?: SelectedFacets;
+		facetValueIds?: string[];
+		collectionSlug?: string;
+	}
+) {
+	const sellerPostalCode =
+		appState?.shippingAddress?.postalCode || appState?.addressBook?.[0]?.postalCode || undefined;
+	return searchExtendedProducts({ ...params, sellerPostalCode });
+}

@@ -136,3 +136,16 @@ gql`
 	}
 	${listedProductFragment}
 `;
+
+// Inject customer postal code if present
+export const searchWithCustomerPostalCode = (
+	appState: any,
+	input: Omit<SearchInput, 'groupByProduct' | 'take'> & { take?: number }
+) => {
+	const sellerPostalCode =
+		appState?.shippingAddress?.postalCode || appState?.addressBook?.[0]?.postalCode || '';
+	return search({
+		...input,
+		...(sellerPostalCode ? { sellerPostalCode } : {}),
+	});
+};

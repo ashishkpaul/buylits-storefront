@@ -6,7 +6,13 @@ import ProductCard from '~/components/products/ProductCard';
 import { APP_STATE } from '~/constants';
 import { SearchResponse } from '~/generated/graphql-shop';
 import { useInfiniteScroll } from '~/hooks/useInfiniteScroll';
-import { searchExtendedProducts } from '~/providers/shop/products/fetchProducts';
+import {
+	resetInfiniteScrollState,
+	toggleFacetGroup,
+	updateSearchResults,
+	type PostalFilteredSearchState,
+} from '~/hooks/usePostalFilteredSearch';
+import { searchExtendedWithCustomerPostalCode } from '~/providers/shop/products/fetchProducts';
 import { groupFacetValues } from '~/utils';
 import { getActiveCustomerPostalCode } from '~/utils/customer-postal-code';
 
@@ -17,36 +23,18 @@ export const useSearchLoader = routeLoader$(async ({ query }) => {
 			.get('f')
 			?.split('-')
 			.filter((f) => f.length > 0) || [];
-	const sellerPostalCode = query.get('seller') || '';
-
-	const search = await searchExtendedProducts({
-		term: term || undefined,
-		facetValueIds: facetParams,
-		sellerPostalCode: sellerPostalCode || undefined,
-	});
-
-	if (term) {
-		if (import.meta.env.DEV) {
-			console.log('🔍 [SEARCH-LOADER] Term:', term, 'Total items:', search?.totalItems);
-		}
-	}
-
 	return {
-		search,
+		__gated: true,
+		search: { items: [], facetValues: [], totalItems: 0 },
 		term,
 		facetParams,
-		sellerPostalCode,
 	};
 });
 
 export default component$(() => {
 	const { url } = useLocation();
-	const searchLoader = useSearchLoader();
-	const appState = useContext(APP_STATE);
 
-	// Auto-derive customer postal code for local filtering
-	const customerPostalCode = getActiveCustomerPostalCode(appState);
-	console.log('🔍 [SEARCH] Customer postal code derived:', customerPostalCode);
+	const appState = useContext(APP_STATE);
 
 	const term = url.searchParams.get('q') || '';
 	const facetParams =
@@ -54,33 +42,33 @@ export default component$(() => {
 			.get('f')
 			?.split('-')
 			.filter((f) => f.length > 0) || [];
-	// Use customer postal code if available, otherwise use URL param
-	const sellerPostalCode = customerPostalCode || url.searchParams.get('seller') || '';
-	console.log('🔍 [SEARCH] Final sellerPostalCode for query:', sellerPostalCode);
 
-	const state = useStore<{
-		showMenu: boolean;
-		search: SearchResponse;
-		facedValues: any[];
-		facetValueIds: string[];
-	}>({
+	const state = useStore<PostalFilteredSearchState>({
 		showMenu: false,
-		search: searchLoader.value.search as SearchResponse,
-		facedValues: groupFacetValues(searchLoader.value.search as any, facetParams),
+		search: { items: [], facetValues: [], totalItems: 0 } as unknown as SearchResponse,
+		facedValues: [],
 		facetValueIds: facetParams,
-	}); // Infinite scroll hook initialization
+		initialFetchDone: false,
+	});
+
+	// Track appState changes and log postal code derivation (wrapper handles injection)
+	useTask$(({ track }) => {
+		track(() => appState.addressBook.length);
+		track(() => appState.shippingAddress.postalCode);
+		const postalCode = getActiveCustomerPostalCode(appState);
+		console.log('🔍 [SEARCH] Customer postal code derived:', postalCode || '<none>');
+	});
 	const infiniteScroll = useInfiniteScroll({
-		initialItems: searchLoader.value.search.items || [],
+		initialItems: [],
 		pageSize: 20,
 		loadMore$: $(async (page: number) => {
-			const search = await searchExtendedProducts({
+			const search = await searchExtendedWithCustomerPostalCode(appState, {
 				term: term || undefined,
 				page,
 				take: 20,
 				facetValueIds: state.facetValueIds,
-				sellerPostalCode: sellerPostalCode || undefined,
 			});
-			return search.items || [];
+			return search?.items || [];
 		}),
 	});
 
@@ -102,24 +90,39 @@ export default component$(() => {
 				.get('f')
 				?.split('-')
 				.filter((f) => f.length > 0) || [];
-		const sellerPostalCode = url.searchParams.get('seller') || '';
 
-		const search = await searchExtendedProducts({
-			term: term || undefined,
-			page: 1,
-			take: 20,
-			facetValueIds: facetParams,
-			sellerPostalCode: sellerPostalCode || undefined,
-		});
-
-		state.search = search as SearchResponse;
-		state.facedValues = groupFacetValues(search as any, facetParams);
-		state.facetValueIds = facetParams;
-		// Reinitialize infinite scroll manually (avoid non-serializable function reference)
-		infPage.value = 1;
-		infHasMore.value = true;
-		infError.value = null;
-		infItems.value = search.items || [];
+		const postalReady =
+			getActiveCustomerPostalCode(appState) !== '' || appState.addressBook.length > 0;
+		if (!state.initialFetchDone && postalReady) {
+			const search = await searchExtendedWithCustomerPostalCode(appState, {
+				term: term || undefined,
+				page: 1,
+				take: 20,
+				facetValueIds: facetParams,
+			});
+			updateSearchResults(state, search as SearchResponse);
+			state.facetValueIds = facetParams;
+			resetInfiniteScrollState(infPage, infHasMore, infError, infItems, state.search.items || []);
+			state.initialFetchDone = true;
+			console.log('🔍 [SEARCH] Initial postal-filtered fetch complete');
+		} else if (state.initialFetchDone) {
+			const search = await searchExtendedWithCustomerPostalCode(appState, {
+				term: term || undefined,
+				page: 1,
+				take: 20,
+				facetValueIds: facetParams,
+			});
+			state.search = search as SearchResponse;
+			state.facedValues = groupFacetValues(search as any, facetParams);
+			state.facetValueIds = facetParams;
+			infPage.value = 1;
+			infHasMore.value = true;
+			infError.value = null;
+			infItems.value = search.items || [];
+		} else {
+			// waiting for postal code; ensure no items shown
+			infItems.value = [];
+		}
 	});
 
 	const onFilterChange = $(async (facetValueId: string) => {
@@ -129,44 +132,30 @@ export default component$(() => {
 
 		const params = new URLSearchParams();
 		const currentTerm = url.searchParams.get('q') || '';
-		const currentSeller = url.searchParams.get('seller') || '';
 
 		if (currentTerm) params.set('q', currentTerm);
 		if (newFacetIds.length > 0) {
 			params.set('f', newFacetIds.join('-'));
 		}
-		if (currentSeller) params.set('seller', currentSeller);
 
 		window.history.pushState(null, '', `?${params.toString()}`);
 
 		// Fetch new search results with updated filters
-		const search = await searchExtendedProducts({
+		const search = await searchExtendedWithCustomerPostalCode(appState, {
 			term: currentTerm || undefined,
 			page: 1,
 			take: 20,
 			facetValueIds: newFacetIds,
-			sellerPostalCode: currentSeller || undefined,
 		});
 
 		state.facetValueIds = newFacetIds;
-		state.search = search as SearchResponse;
-		state.facedValues = groupFacetValues(search as any, newFacetIds);
-
-		// Reset infinite scroll
-		infPage.value = 1;
-		infHasMore.value = true;
-		infError.value = null;
-		infItems.value = search.items || [];
+		updateSearchResults(state, search as SearchResponse);
+		resetInfiniteScrollState(infPage, infHasMore, infError, infItems, state.search.items || []);
 	});
 
 	// Correct facet group toggle: groupFacetValues returns objects with shape { id, name, open, values }
 	const onOpenCloseFilter = $((facetGroupId: string) => {
-		state.facedValues = state.facedValues.map((group) => {
-			if (group.id === facetGroupId) {
-				group.open = !group.open;
-			}
-			return group;
-		});
+		state.facedValues = toggleFacetGroup(state.facedValues, facetGroupId);
 	});
 
 	return (
@@ -201,7 +190,23 @@ export default component$(() => {
 						{state.facetValueIds.length > 0 && ` (${state.facetValueIds.length} filters applied)`}
 					</p>
 
-					{infItems.value && infItems.value.length > 0 ? (
+					{!state.initialFetchDone ? (
+						<div
+							class="grid grid-cols-1 gap-y-6 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8"
+							aria-label="Loading local products"
+						>
+							{Array.from({ length: 8 }).map((_, i) => (
+								<div key={i} class="animate-pulse border rounded p-4 h-64 bg-gray-50">
+									<div class="h-32 bg-gray-200 rounded" />
+									<div class="mt-4 h-4 bg-gray-200 rounded w-3/4" />
+									<div class="mt-2 h-4 bg-gray-100 rounded w-1/2" />
+								</div>
+							))}
+							<p class="col-span-full text-center text-sm text-gray-400 mt-4">
+								Loading local products…
+							</p>
+						</div>
+					) : infItems.value && infItems.value.length > 0 ? (
 						<div class="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
 							{infItems.value.map((item: any) => (
 								<ProductCard

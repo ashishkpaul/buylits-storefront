@@ -1,5 +1,5 @@
 import gql from 'graphql-tag';
-import { Collection, SearchInput } from '~/generated/graphql-shop';
+import { Collection, SearchInput, SearchResponse } from '~/generated/graphql-shop';
 import { shopSdk } from '~/graphql-wrapper';
 
 export const getCollections = async () => {
@@ -19,27 +19,47 @@ export const getCollectionBySlug = async (slug: string) => {
 	return res?.collection as Collection;
 };
 
-// Fetch products from a collection using search API with pagination
+// Fetch products from a collection using search API with pagination, optional facets & seller postal code
 export const getCollectionProducts = async (
-	collectionId: string,
+	collectionSlug: string,
 	take: number = 20,
-	skip: number = 0
-) => {
+	skip: number = 0,
+	facetValueIds: string[] = [],
+	sellerPostalCode?: string,
+	term?: string
+): Promise<SearchResponse | undefined> => {
 	const searchInput: SearchInput = {
-		collectionId,
+		collectionSlug,
 		take,
 		skip,
-		groupByProduct: false, // Get variants directly
+		groupByProduct: false,
 	};
 
-	return await shopSdk.search({ input: searchInput }).then((res) => {
-		const items = res.search?.items || [];
-		const totalItems = res.search?.totalItems || 0;
-		return {
-			items,
-			totalItems,
-		};
-	});
+	if (facetValueIds.length) {
+		searchInput.facetValueFilters = [{ or: facetValueIds }];
+	}
+	if (sellerPostalCode) {
+		searchInput.sellerPostalCode = sellerPostalCode;
+	}
+	if (term) {
+		searchInput.term = term;
+	}
+
+	try {
+		const res = await shopSdk.search({ input: searchInput });
+		return res.search as SearchResponse;
+	} catch (error) {
+		console.error('Error fetching collection products:', {
+			collectionSlug,
+			take,
+			skip,
+			facetValueIds,
+			sellerPostalCode,
+			term,
+			error,
+		});
+		return undefined;
+	}
 };
 
 // GraphQL query for collections

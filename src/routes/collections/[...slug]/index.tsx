@@ -1,4 +1,12 @@
-import { $, component$, useContext, useStore, useTask$ } from '@qwik.dev/core';
+import {
+	$,
+	component$,
+	useContext,
+	useSignal,
+	useStore,
+	useTask$,
+	useVisibleTask$,
+} from '@qwik.dev/core';
 import { DocumentHead, routeLoader$, useLocation } from '@qwik.dev/router';
 import Breadcrumbs from '~/components/breadcrumbs/Breadcrumbs';
 import CollectionCard from '~/components/collection-card/CollectionCard';
@@ -8,18 +16,22 @@ import ProductCard from '~/components/products/ProductCard';
 import { APP_STATE } from '~/constants';
 import { SearchResponse } from '~/generated/graphql-shop';
 import { useInfiniteScroll } from '~/hooks/useInfiniteScroll';
+import {
+	resetInfiniteScrollState,
+	toggleFacetGroup,
+	updateSearchResults,
+	type PostalFilteredSearchState,
+} from '~/hooks/usePostalFilteredSearch';
 import { getCollectionBySlug } from '~/providers/shop/collections/collections';
 import {
 	searchQueryWithCollectionSlug,
 	searchQueryWithTerm,
 } from '~/providers/shop/products/products';
-import { FacetWithValues } from '~/types';
 import {
 	changeUrlParamsWithoutRefresh,
 	cleanUpParams,
 	enableDisableFacetValues,
 	generateDocumentHead,
-	groupFacetValues,
 } from '~/utils';
 import { getActiveCustomerPostalCode } from '~/utils/customer-postal-code';
 
@@ -30,9 +42,14 @@ export const useCollectionLoader = routeLoader$(async ({ params }) => {
 export const useSearchLoader = routeLoader$(async ({ params: p, url }) => {
 	const params = cleanUpParams(p);
 	const activeFacetValueIds: string[] = url.searchParams.get('f')?.split('-') || [];
-	return activeFacetValueIds.length
-		? await searchQueryWithTerm(params.slug, '', activeFacetValueIds)
-		: await searchQueryWithCollectionSlug(params.slug);
+	return {
+		__gated: true,
+		items: [],
+		facetValues: [],
+		totalItems: 0,
+		activeFacetValueIds,
+		collectionSlug: params.slug,
+	};
 });
 
 export default component$(() => {
@@ -41,32 +58,35 @@ export default component$(() => {
 	const activeFacetValueIds: string[] = url.searchParams.get('f')?.split('-') || [];
 
 	const collectionSignal = useCollectionLoader();
-	const searchSignal = useSearchLoader();
+	useSearchLoader(); // Trigger loader for routing
 	const appState = useContext(APP_STATE);
 
-	// Auto-derive customer postal code for local filtering
-	const customerPostalCode = getActiveCustomerPostalCode(appState);
-	console.log('🏪 [COLLECTION] Customer postal code derived:', customerPostalCode);
-	console.log(
-		'🏪 [COLLECTION] Will filter products by sellerPostalCode:',
-		customerPostalCode || 'NONE'
-	);
+	// Use signal to store customer postal code (derived on client)
+	const customerPostalCode = useSignal('');
+	const lastAppliedPostalCode = useSignal('');
 
-	const state = useStore<{
-		showMenu: boolean;
-		search: SearchResponse;
-		facedValues: FacetWithValues[];
-		facetValueIds: string[];
-	}>({
+	const state = useStore<PostalFilteredSearchState>({
 		showMenu: false,
-		search: searchSignal.value as SearchResponse,
-		facedValues: groupFacetValues(searchSignal.value as SearchResponse, activeFacetValueIds),
+		search: { items: [], facetValues: [], totalItems: 0 } as unknown as SearchResponse,
+		facedValues: [],
 		facetValueIds: activeFacetValueIds,
+		initialFetchDone: false,
+	});
+
+	// Derive customer postal code reactively when address book updates (CLIENT ONLY)
+	useVisibleTask$(({ track }) => {
+		track(() => appState.addressBook.length);
+		track(() => appState.shippingAddress.postalCode);
+		const postalCode = getActiveCustomerPostalCode(appState);
+		customerPostalCode.value = postalCode;
+		if (import.meta.env.DEV) {
+			console.log('🏪 [COLLECTION] Customer postal code derived (client-side):', postalCode);
+		}
 	});
 
 	// Infinite scroll hook for collections
 	const infiniteScroll = useInfiniteScroll({
-		initialItems: searchSignal.value.items || [],
+		initialItems: [],
 		pageSize: 20,
 		loadMore$: $(async (page: number) => {
 			const search = state.facetValueIds.length
@@ -76,13 +96,13 @@ export default component$(() => {
 						state.facetValueIds,
 						20,
 						(page - 1) * 20,
-						customerPostalCode || undefined
+						customerPostalCode.value || undefined
 					)
 				: await searchQueryWithCollectionSlug(
 						params.slug,
 						20,
 						(page - 1) * 20,
-						customerPostalCode || undefined
+						customerPostalCode.value || undefined
 					);
 			return search.items || [];
 		}),
@@ -99,24 +119,48 @@ export default component$(() => {
 
 	useTask$(async ({ track }) => {
 		track(() => collectionSignal.value.slug);
+		track(() => customerPostalCode.value);
+		track(() => url.searchParams.get('f'));
+
 		params.slug = cleanUpParams(p).slug;
 		state.facetValueIds = url.searchParams.get('f')?.split('-') || [];
-		state.search = state.facetValueIds.length
-			? await searchQueryWithTerm(
-					params.slug,
-					'',
-					state.facetValueIds,
-					20,
-					0,
-					customerPostalCode || undefined
-				)
-			: await searchQueryWithCollectionSlug(params.slug, 20, 0, customerPostalCode || undefined);
-		state.facedValues = groupFacetValues(state.search as SearchResponse, state.facetValueIds);
-		// Reset infinite scroll on collection/filter change
-		infPage.value = 1;
-		infHasMore.value = true;
-		infError.value = null;
-		infItems.value = state.search.items || [];
+
+		const postalReady = customerPostalCode.value !== '' || appState.addressBook.length > 0;
+		const shouldRefetch =
+			customerPostalCode.value !== '' && lastAppliedPostalCode.value !== customerPostalCode.value;
+
+		if ((true || shouldRefetch) && postalReady && !state.initialFetchDone) {
+			state.search = state.facetValueIds.length
+				? await searchQueryWithTerm(
+						params.slug,
+						'',
+						state.facetValueIds,
+						20,
+						0,
+						customerPostalCode.value || undefined
+					)
+				: await searchQueryWithCollectionSlug(
+						params.slug,
+						20,
+						0,
+						customerPostalCode.value || undefined
+					);
+			updateSearchResults(state, state.search);
+			resetInfiniteScrollState(infPage, infHasMore, infError, infItems, state.search.items || []);
+			state.initialFetchDone = true;
+			if (import.meta.env.DEV) {
+				console.log('🏪 [COLLECTION] Initial postal-filtered fetch complete');
+			}
+		}
+		if (shouldRefetch && state.initialFetchDone) {
+			lastAppliedPostalCode.value = customerPostalCode.value;
+			if (import.meta.env.DEV) {
+				console.log('🏪 [COLLECTION] Refetched with postal code:', customerPostalCode.value);
+			}
+		}
+		if (!state.initialFetchDone && infItems.value.length) {
+			infItems.value = [];
+		}
 	});
 
 	const onFilterChange = $(async (id: string) => {
@@ -137,23 +181,19 @@ export default component$(() => {
 					state.facetValueIds,
 					20,
 					0,
-					customerPostalCode || undefined
+					customerPostalCode.value || undefined
 				)
-			: await searchQueryWithCollectionSlug(params.slug, 20, 0, customerPostalCode || undefined);
-		// Reset infinite scroll on filter change
-		infPage.value = 1;
-		infHasMore.value = true;
-		infError.value = null;
-		infItems.value = state.search.items || [];
+			: await searchQueryWithCollectionSlug(
+					params.slug,
+					20,
+					0,
+					customerPostalCode.value || undefined
+				);
+		resetInfiniteScrollState(infPage, infHasMore, infError, infItems, state.search.items || []);
 	});
 
 	const onOpenCloseFilter = $((id: string) => {
-		state.facedValues = state.facedValues.map((f) => {
-			if (f.id === id) {
-				f.open = !f.open;
-			}
-			return f;
-		});
+		state.facedValues = toggleFacetGroup(state.facedValues, id);
 	});
 
 	return (
@@ -246,8 +286,11 @@ export const head: DocumentHead = ({ resolveValue, url }) => {
 	const collection = resolveValue(useCollectionLoader);
 	let image = collection.children?.[0]?.featuredAsset?.preview || undefined;
 	if (!image) {
-		const search = resolveValue(useSearchLoader);
-		image = search.items?.[0]?.productAsset?.preview || undefined;
+		const search = resolveValue(useSearchLoader) as any;
+		// Handle gated loader case - no items available during SSR
+		if (!search.__gated && search.items?.[0]) {
+			image = search.items[0].productAsset?.preview || undefined;
+		}
 	}
 	return generateDocumentHead(url.href, collection.name, undefined, image);
 };
