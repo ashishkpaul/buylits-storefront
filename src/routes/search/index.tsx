@@ -24,15 +24,9 @@ export const useSearchLoader = routeLoader$(async ({ query }) => {
 	});
 
 	if (term) {
-		console.log('🔍 [SEARCH-LOADER] Search results for term:', term);
-		console.log('🔍 [SEARCH-LOADER] Total items:', search?.totalItems);
-		console.log(
-			'🔍 [SEARCH-LOADER] Products returned:',
-			search?.items?.map((item: any) => ({
-				name: item.productName,
-				facetValueIds: item.facetValueIds,
-			}))
-		);
+		if (import.meta.env.DEV) {
+			console.log('🔍 [SEARCH-LOADER] Term:', term, 'Total items:', search?.totalItems);
+		}
 	}
 
 	return {
@@ -156,12 +150,13 @@ export default component$(() => {
 		infItems.value = search.items || [];
 	});
 
-	const onOpenCloseFilter = $((facetId: string) => {
-		state.facedValues = state.facedValues.map((f) => {
-			if (f.facetValue?.facet?.id === facetId) {
-				f.open = !f.open;
+	// Correct facet group toggle: groupFacetValues returns objects with shape { id, name, open, values }
+	const onOpenCloseFilter = $((facetGroupId: string) => {
+		state.facedValues = state.facedValues.map((group) => {
+			if (group.id === facetGroupId) {
+				group.open = !group.open;
 			}
-			return f;
+			return group;
 		});
 	});
 

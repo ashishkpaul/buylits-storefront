@@ -33,12 +33,14 @@ export async function searchExtendedProducts(params: {
 			? [{ or: facetValueIds }]
 			: buildFacetValueFilters(selectedFacets);
 
-	console.log('🔍 [STOREFRONT] Search params:', {
-		term,
-		facetValueFilters,
-		collectionSlug,
-		sellerPostalCode,
-	});
+	if (import.meta.env.DEV) {
+		console.log('🔍 [STOREFRONT] Search params:', {
+			term,
+			facetValueFilters,
+			collectionSlug,
+			sellerPostalCode,
+		});
+	}
 
 	const input: any = {
 		term: term || '',
@@ -53,11 +55,13 @@ export async function searchExtendedProducts(params: {
 	try {
 		const response = await sdk.searchExtended({ input });
 
-		console.log('🔍 [STOREFRONT] Search response:', {
-			totalItems: response.search?.totalItems,
-			facetValues: response.search?.facetValues?.length,
-			items: response.search?.items?.length,
-		});
+		if (import.meta.env.DEV) {
+			console.log('🔍 [STOREFRONT] Search response:', {
+				totalItems: response.search?.totalItems,
+				facetValues: response.search?.facetValues?.length,
+				items: response.search?.items?.length,
+			});
+		}
 
 		return response.search;
 	} catch (error) {
