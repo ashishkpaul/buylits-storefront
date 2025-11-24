@@ -12,11 +12,12 @@ import { guessLocale } from 'compiled-i18n';
 import { ImageTransformerProps, useImageProvider } from '~/components/image/image';
 import Menu from '~/components/menu/Menu';
 import { APP_STATE, CUSTOMER_NOT_DEFINED_ID, IMAGE_RESOLUTIONS } from '~/constants';
-import { Order } from '~/generated/graphql-shop';
+import { Address, Order } from '~/generated/graphql-shop';
 import { getAvailableCountriesQuery } from '~/providers/shop/checkout/checkout';
 import { getCollections } from '~/providers/shop/collections/collections';
 import { getActiveOrderQuery } from '~/providers/shop/orders/order';
-import { ActiveCustomer, AppState } from '~/types';
+import { getActiveCustomerAddressesQuery } from '~/providers/shop/customer/customer';
+import { ActiveCustomer, AppState, ShippingAddress } from '~/types';
 import Cart from '../components/cart/Cart';
 import Footer from '../components/footer/footer';
 import Header from '../components/header/header';
@@ -82,6 +83,34 @@ export default component$(() => {
 
 	useVisibleTask$(async () => {
 		state.activeOrder = await getActiveOrderQuery();
+
+		// Load customer addresses for postal code filtering
+		try {
+			const activeCustomer = await getActiveCustomerAddressesQuery();
+			if (activeCustomer?.addresses) {
+				const shippingAddresses: ShippingAddress[] = (activeCustomer.addresses as Address[]).map(
+					(address: Address) =>
+						({
+							id: address.id,
+							fullName: address.fullName,
+							streetLine1: address.streetLine1,
+							streetLine2: address.streetLine2,
+							company: address.company,
+							city: address.city,
+							province: address.province,
+							postalCode: address.postalCode,
+							countryCode: address.country.code,
+							phoneNumber: address.phoneNumber,
+							defaultShippingAddress: address.defaultShippingAddress,
+							defaultBillingAddress: address.defaultBillingAddress,
+						}) as ShippingAddress
+				);
+				state.addressBook = shippingAddresses;
+			}
+		} catch (error) {
+			// Customer not logged in or error fetching addresses
+			console.debug('Could not load customer addresses:', error);
+		}
 	});
 
 	useVisibleTask$(({ track }) => {
