@@ -63,7 +63,6 @@ export default component$(() => {
 
 	// Use signal to store customer postal code (derived on client)
 	const customerPostalCode = useSignal('');
-	const lastAppliedPostalCode = useSignal('');
 
 	const state = useStore<PostalFilteredSearchState>({
 		showMenu: false,
@@ -79,9 +78,7 @@ export default component$(() => {
 		track(() => appState.shippingAddress.postalCode);
 		const postalCode = getActiveCustomerPostalCode(appState);
 		customerPostalCode.value = postalCode;
-		if (import.meta.env.DEV) {
-			console.log('🏪 [COLLECTION] Customer postal code derived (client-side):', postalCode);
-		}
+		console.log('🏪 [COLLECTION] Postal code ready:', postalCode || '<none>');
 	});
 
 	// Infinite scroll hook for collections
@@ -137,11 +134,7 @@ export default component$(() => {
 			return;
 		}
 
-		const postalReady = customerPostalCode.value !== '' || appState.addressBook.length > 0;
-		const shouldRefetch =
-			customerPostalCode.value !== '' && lastAppliedPostalCode.value !== customerPostalCode.value;
-
-		if ((true || shouldRefetch) && postalReady && !state.initialFetchDone) {
+		if (!state.initialFetchDone) {
 			state.search = state.facetValueIds.length
 				? await searchQueryWithTerm(
 						params.slug,
@@ -161,10 +154,6 @@ export default component$(() => {
 			resetInfiniteScrollState(infPage, infHasMore, infError, infItems, state.search.items || []);
 			state.initialFetchDone = true;
 			console.log('🏪 [COLLECTION] Initial postal-filtered fetch complete');
-		}
-		if (shouldRefetch && state.initialFetchDone) {
-			lastAppliedPostalCode.value = customerPostalCode.value;
-			console.log('🏪 [COLLECTION] Refetched with postal code:', customerPostalCode.value);
 		}
 		if (!state.initialFetchDone && infItems.value.length) {
 			infItems.value = [];

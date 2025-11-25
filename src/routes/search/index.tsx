@@ -67,10 +67,7 @@ export default component$(() => {
 		track(() => appState.shippingAddress.postalCode);
 		const postalCode = getActiveCustomerPostalCode(appState);
 		customerPostalCode.value = postalCode;
-		// ALWAYS log to diagnose issue
-		console.log('🔍 [SEARCH] Customer postal code derived:', postalCode || '<none>');
-		console.log('🔍 [SEARCH] Customer ID:', appState.customer?.id);
-		console.log('🔍 [SEARCH] Address book entries:', appState.addressBook?.length || 0);
+		console.log('🔍 [SEARCH] Postal code ready:', postalCode || '<none>');
 	});
 	const infiniteScroll = useInfiniteScroll({
 		initialItems: [],
