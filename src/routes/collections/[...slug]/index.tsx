@@ -259,6 +259,17 @@ export default component$(() => {
 					</div>
 					{/* Sentinel for infinite scroll */}
 					<div ref={(el) => (sentinelRef.value = el)} class="h-8"></div>
+					{/* Empty state when no local products after initial fetch */}
+					{state.initialFetchDone &&
+						!infiniteScroll.isLoading.value &&
+						infItems.value.length === 0 && (
+							<div class="text-center py-12" aria-label="No local collection products">
+								<p class="text-gray-600 font-medium">No local products found in this collection.</p>
+								<p class="text-sm text-gray-400 mt-2">
+									Try different filters or browse other collections.
+								</p>
+							</div>
+						)}
 					{/* Loading indicator */}
 					{infiniteScroll.isLoading.value && (
 						<div class="flex justify-center items-center py-6">

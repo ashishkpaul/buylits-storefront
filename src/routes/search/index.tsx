@@ -222,8 +222,11 @@ export default component$(() => {
 							))}
 						</div>
 					) : (
-						<div class="text-center py-12">
-							<p class="text-gray-500">No products found matching your filters.</p>
+						<div class="text-center py-12" aria-label="No local products">
+							<p class="text-gray-600 font-medium">No local products found.</p>
+							<p class="text-sm text-gray-400 mt-2">
+								Try adjusting filters or check a different postal area.
+							</p>
 						</div>
 					)}
 					<div ref={(el) => (sentinelRef.value = el)} class="h-8"></div>
