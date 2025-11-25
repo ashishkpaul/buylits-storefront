@@ -82,29 +82,32 @@ export default component$(() => {
 	useContextProvider(APP_STATE, state);
 
 	useVisibleTask$(async () => {
-		console.log('🔄 [LAYOUT] Loading active order and customer addresses...');
+		if (import.meta.env.DEV)
+			console.log('🔄 [LAYOUT] Loading active order and customer addresses...');
 		state.activeOrder = await getActiveOrderQuery();
-		console.log('✅ [LAYOUT] Active order loaded');
+		if (import.meta.env.DEV) console.log('✅ [LAYOUT] Active order loaded');
 
 		// Load customer addresses for postal code filtering
 		try {
-			console.log('🔄 [LAYOUT] Fetching customer addresses...');
+			if (import.meta.env.DEV) console.log('🔄 [LAYOUT] Fetching customer addresses...');
 			const activeCustomer = await getActiveCustomerAddressesQuery();
-			console.log('📦 [LAYOUT] Customer query result:', {
-				hasCustomer: !!activeCustomer,
-				hasAddresses: !!activeCustomer?.addresses,
-				addressCount: activeCustomer?.addresses?.length || 0,
-			});
+			if (import.meta.env.DEV)
+				console.log('📦 [LAYOUT] Customer query result:', {
+					hasCustomer: !!activeCustomer,
+					hasAddresses: !!activeCustomer?.addresses,
+					addressCount: activeCustomer?.addresses?.length || 0,
+				});
 
 			if (activeCustomer?.addresses) {
 				const shippingAddresses: ShippingAddress[] = (activeCustomer.addresses as Address[]).map(
 					(address: Address) => {
-						console.log('📍 [LAYOUT] Processing address:', {
-							id: address.id,
-							postalCode: address.postalCode,
-							defaultShipping: address.defaultShippingAddress,
-							defaultBilling: address.defaultBillingAddress,
-						});
+						if (import.meta.env.DEV)
+							console.log('📍 [LAYOUT] Processing address:', {
+								id: address.id,
+								postalCode: address.postalCode,
+								defaultShipping: address.defaultShippingAddress,
+								defaultBilling: address.defaultBillingAddress,
+							});
 						return {
 							id: address.id,
 							fullName: address.fullName,
@@ -122,16 +125,17 @@ export default component$(() => {
 					}
 				);
 				state.addressBook = shippingAddresses;
-				console.log('✅ [LAYOUT] Address book populated:', {
-					count: state.addressBook.length,
-					postalCodes: state.addressBook.map((a) => a.postalCode),
-				});
+				if (import.meta.env.DEV)
+					console.log('✅ [LAYOUT] Address book populated:', {
+						count: state.addressBook.length,
+						postalCodes: state.addressBook.map((a) => a.postalCode),
+					});
 			} else {
-				console.log('⚠️ [LAYOUT] No addresses found for customer');
+				if (import.meta.env.DEV) console.log('⚠️ [LAYOUT] No addresses found for customer');
 			}
 		} catch (error) {
 			// Customer not logged in or error fetching addresses
-			console.log('❌ [LAYOUT] Could not load customer addresses:', error);
+			if (import.meta.env.DEV) console.log('❌ [LAYOUT] Could not load customer addresses:', error);
 		}
 	});
 

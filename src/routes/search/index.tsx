@@ -56,7 +56,8 @@ export default component$(() => {
 		track(() => appState.addressBook.length);
 		track(() => appState.shippingAddress.postalCode);
 		const postalCode = getActiveCustomerPostalCode(appState);
-		console.log('🔍 [SEARCH] Customer postal code derived:', postalCode || '<none>');
+		if (import.meta.env.DEV)
+			console.log('🔍 [SEARCH] Customer postal code derived:', postalCode || '<none>');
 	});
 	const infiniteScroll = useInfiniteScroll({
 		initialItems: [],
@@ -104,7 +105,7 @@ export default component$(() => {
 			state.facetValueIds = facetParams;
 			resetInfiniteScrollState(infPage, infHasMore, infError, infItems, state.search.items || []);
 			state.initialFetchDone = true;
-			console.log('🔍 [SEARCH] Initial postal-filtered fetch complete');
+			if (import.meta.env.DEV) console.log('🔍 [SEARCH] Initial postal-filtered fetch complete');
 		} else if (state.initialFetchDone) {
 			const search = await searchExtendedWithCustomerPostalCode(appState, {
 				term: term || undefined,

@@ -113,11 +113,12 @@ export default component$<{
 																	type="checkbox"
 																	checked={value.selected}
 																	onChange$={$(() => {
-																		console.log(
-																			'🔍 [FILTER-MOBILE] Checkbox changed for:',
-																			value.id,
-																			value.name
-																		);
+																		if (import.meta.env.DEV)
+																			console.log(
+																				'🔍 [FILTER-MOBILE] Checkbox changed for:',
+																				value.id,
+																				value.name
+																			);
 																		onFilterChange$(value.id);
 																	})}
 																/>
