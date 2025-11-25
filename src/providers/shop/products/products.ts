@@ -144,11 +144,9 @@ export const searchWithCustomerPostalCode = (
 	input: Omit<SearchInput, 'groupByProduct' | 'take'> & { take?: number }
 ) => {
 	const sellerPostalCode = getActiveCustomerPostalCode(appState);
-	if (!sellerPostalCode) {
-		return Promise.resolve({ items: [], facetValues: [], totalItems: 0 } as any);
-	}
+	// Pass postal code if available; backend handles filtering
 	return search({
 		...input,
-		...(sellerPostalCode ? { sellerPostalCode } : {}),
+		...(sellerPostalCode && { sellerPostalCode }),
 	});
 };

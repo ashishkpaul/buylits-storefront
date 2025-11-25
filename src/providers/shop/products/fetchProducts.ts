@@ -84,9 +84,6 @@ export function searchExtendedWithCustomerPostalCode(
 	}
 ) {
 	const sellerPostalCode = getActiveCustomerPostalCode(appState);
-	// If postal code not yet available, return empty shell to avoid unfiltered fetch
-	if (!sellerPostalCode) {
-		return Promise.resolve({ items: [], facetValues: [], totalItems: 0 });
-	}
-	return searchExtendedProducts({ ...params, sellerPostalCode });
+	// Pass postal code if available; backend handles filtering
+	return searchExtendedProducts({ ...params, ...(sellerPostalCode && { sellerPostalCode }) });
 }

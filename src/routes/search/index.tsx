@@ -92,9 +92,8 @@ export default component$(() => {
 				?.split('-')
 				.filter((f) => f.length > 0) || [];
 
-		const postalReady =
-			getActiveCustomerPostalCode(appState) !== '' || appState.addressBook.length > 0;
-		if (!state.initialFetchDone && postalReady) {
+		// Fetch search results (postal code will be applied if available)
+		if (!state.initialFetchDone) {
 			const search = await searchExtendedWithCustomerPostalCode(appState, {
 				term: term || undefined,
 				page: 1,
