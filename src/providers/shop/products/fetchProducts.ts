@@ -1,6 +1,7 @@
 import { getSdk } from '~/generated/graphql-shop';
 import { requester } from '~/graphql-wrapper';
 import { buildFacetValueFilters, type SelectedFacets } from '~/utils/buildFacetValueFilters';
+import { getActiveCustomerPostalCode } from '~/utils/customer-postal-code';
 
 const sdk = getSdk(requester);
 
@@ -82,7 +83,10 @@ export function searchExtendedWithCustomerPostalCode(
 		collectionSlug?: string;
 	}
 ) {
-	const sellerPostalCode =
-		appState?.shippingAddress?.postalCode || appState?.addressBook?.[0]?.postalCode || undefined;
+	const sellerPostalCode = getActiveCustomerPostalCode(appState);
+	// If postal code not yet available, return empty shell to avoid unfiltered fetch
+	if (!sellerPostalCode) {
+		return Promise.resolve({ items: [], facetValues: [], totalItems: 0 });
+	}
 	return searchExtendedProducts({ ...params, sellerPostalCode });
 }

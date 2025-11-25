@@ -1,6 +1,7 @@
 import gql from 'graphql-tag';
 import { Product, ProductQuery, SearchInput, SearchResponse } from '~/generated/graphql-shop';
 import { shopSdk } from '~/graphql-wrapper';
+import { getActiveCustomerPostalCode } from '~/utils/customer-postal-code';
 
 export const search = async (searchInput: SearchInput) => {
 	return await shopSdk
@@ -142,8 +143,10 @@ export const searchWithCustomerPostalCode = (
 	appState: any,
 	input: Omit<SearchInput, 'groupByProduct' | 'take'> & { take?: number }
 ) => {
-	const sellerPostalCode =
-		appState?.shippingAddress?.postalCode || appState?.addressBook?.[0]?.postalCode || '';
+	const sellerPostalCode = getActiveCustomerPostalCode(appState);
+	if (!sellerPostalCode) {
+		return Promise.resolve({ items: [], facetValues: [], totalItems: 0 } as any);
+	}
 	return search({
 		...input,
 		...(sellerPostalCode ? { sellerPostalCode } : {}),

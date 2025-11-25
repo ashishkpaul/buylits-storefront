@@ -245,18 +245,36 @@ export default component$(() => {
 					/>
 				)}
 				<div class="sm:col-span-5 lg:col-span-4">
-					<div class="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
-						{infItems.value.map((item: any) => (
-							<ProductCard
-								key={item.productId}
-								productAsset={item.productAsset}
-								productName={item.productName}
-								slug={item.slug}
-								priceWithTax={item.priceWithTax}
-								currencyCode={item.currencyCode}
-							></ProductCard>
-						))}
-					</div>
+					{!state.initialFetchDone ? (
+						<div
+							class="grid grid-cols-1 gap-y-6 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8"
+							aria-label="Loading local collection products"
+						>
+							{Array.from({ length: 8 }).map((_, i) => (
+								<div key={i} class="animate-pulse border rounded p-4 h-64 bg-gray-50">
+									<div class="h-32 bg-gray-200 rounded" />
+									<div class="mt-4 h-4 bg-gray-200 rounded w-3/4" />
+									<div class="mt-2 h-4 bg-gray-100 rounded w-1/2" />
+								</div>
+							))}
+							<p class="col-span-full text-center text-sm text-gray-400 mt-4">
+								Loading local products…
+							</p>
+						</div>
+					) : (
+						<div class="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
+							{infItems.value.map((item: any) => (
+								<ProductCard
+									key={item.productId}
+									productAsset={item.productAsset}
+									productName={item.productName}
+									slug={item.slug}
+									priceWithTax={item.priceWithTax}
+									currencyCode={item.currencyCode}
+								></ProductCard>
+							))}
+						</div>
+					)}
 					{/* Sentinel for infinite scroll */}
 					<div ref={(el) => (sentinelRef.value = el)} class="h-8"></div>
 					{/* Empty state when no local products after initial fetch */}
