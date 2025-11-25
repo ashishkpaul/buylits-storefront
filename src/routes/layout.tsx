@@ -89,14 +89,16 @@ export default component$(() => {
 
 		// Load customer addresses for postal code filtering
 		try {
-			if (import.meta.env.DEV) console.log('🔄 [LAYOUT] Fetching customer addresses...');
+			// ALWAYS log to diagnose issue
+			console.log('🔄 [LAYOUT] Fetching customer addresses...');
 			const activeCustomer = await getActiveCustomerAddressesQuery();
-			if (import.meta.env.DEV)
-				console.log('📦 [LAYOUT] Customer query result:', {
-					hasCustomer: !!activeCustomer,
-					hasAddresses: !!activeCustomer?.addresses,
-					addressCount: activeCustomer?.addresses?.length || 0,
-				});
+			console.log('📦 [LAYOUT] Customer query result:', {
+				hasCustomer: !!activeCustomer,
+				customerId: activeCustomer?.id,
+				hasAddresses: !!activeCustomer?.addresses,
+				addressCount: activeCustomer?.addresses?.length || 0,
+				rawResponse: activeCustomer,
+			});
 
 			if (activeCustomer?.addresses) {
 				const shippingAddresses: ShippingAddress[] = (activeCustomer.addresses as Address[]).map(

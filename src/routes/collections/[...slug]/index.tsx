@@ -125,6 +125,18 @@ export default component$(() => {
 		params.slug = cleanUpParams(p).slug;
 		state.facetValueIds = url.searchParams.get('f')?.split('-') || [];
 
+		console.log(
+			'🏪 [COLLECTION] useTask$ triggered - postal code:',
+			customerPostalCode.value || '<none>'
+		);
+
+		// Wait for postal code before initial fetch (prevent flash of wrong products)
+		if (!state.initialFetchDone && customerPostalCode.value === '') {
+			console.log('🏪 [COLLECTION] Waiting for postal code to load...');
+			infItems.value = [];
+			return;
+		}
+
 		const postalReady = customerPostalCode.value !== '' || appState.addressBook.length > 0;
 		const shouldRefetch =
 			customerPostalCode.value !== '' && lastAppliedPostalCode.value !== customerPostalCode.value;
@@ -148,15 +160,11 @@ export default component$(() => {
 			updateSearchResults(state, state.search);
 			resetInfiniteScrollState(infPage, infHasMore, infError, infItems, state.search.items || []);
 			state.initialFetchDone = true;
-			if (import.meta.env.DEV) {
-				console.log('🏪 [COLLECTION] Initial postal-filtered fetch complete');
-			}
+			console.log('🏪 [COLLECTION] Initial postal-filtered fetch complete');
 		}
 		if (shouldRefetch && state.initialFetchDone) {
 			lastAppliedPostalCode.value = customerPostalCode.value;
-			if (import.meta.env.DEV) {
-				console.log('🏪 [COLLECTION] Refetched with postal code:', customerPostalCode.value);
-			}
+			console.log('🏪 [COLLECTION] Refetched with postal code:', customerPostalCode.value);
 		}
 		if (!state.initialFetchDone && infItems.value.length) {
 			infItems.value = [];

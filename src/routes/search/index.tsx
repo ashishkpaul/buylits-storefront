@@ -1,4 +1,12 @@
-import { $, component$, useContext, useStore, useTask$ } from '@qwik.dev/core';
+import {
+	$,
+	component$,
+	useContext,
+	useSignal,
+	useStore,
+	useTask$,
+	useVisibleTask$,
+} from '@qwik.dev/core';
 import { routeLoader$, useLocation } from '@qwik.dev/router';
 import Filters from '~/components/facet-filter-controls/Filters';
 import FiltersButton from '~/components/filters-button/FiltersButton';
@@ -51,13 +59,18 @@ export default component$(() => {
 		initialFetchDone: false,
 	});
 
-	// Track appState changes and log postal code derivation (wrapper handles injection)
-	useTask$(({ track }) => {
+	// Track customer postal code for local-only filtering
+	const customerPostalCode = useSignal('');
+
+	useVisibleTask$(({ track }) => {
 		track(() => appState.addressBook.length);
 		track(() => appState.shippingAddress.postalCode);
 		const postalCode = getActiveCustomerPostalCode(appState);
-		if (import.meta.env.DEV)
-			console.log('🔍 [SEARCH] Customer postal code derived:', postalCode || '<none>');
+		customerPostalCode.value = postalCode;
+		// ALWAYS log to diagnose issue
+		console.log('🔍 [SEARCH] Customer postal code derived:', postalCode || '<none>');
+		console.log('🔍 [SEARCH] Customer ID:', appState.customer?.id);
+		console.log('🔍 [SEARCH] Address book entries:', appState.addressBook?.length || 0);
 	});
 	const infiniteScroll = useInfiniteScroll({
 		initialItems: [],
@@ -84,6 +97,8 @@ export default component$(() => {
 
 	useTask$(async ({ track }) => {
 		track(() => url.searchParams.toString());
+		// Track postal code changes to refetch when it becomes available
+		track(() => customerPostalCode.value);
 
 		const term = url.searchParams.get('q') || '';
 		const facetParams =
@@ -92,7 +107,19 @@ export default component$(() => {
 				?.split('-')
 				.filter((f) => f.length > 0) || [];
 
-		// Fetch search results (postal code will be applied if available)
+		console.log(
+			'🔍 [SEARCH] useTask$ triggered - postal code:',
+			customerPostalCode.value || '<none>'
+		);
+
+		// Wait for postal code to be available before first search (prevent flash of wrong products)
+		if (!state.initialFetchDone && customerPostalCode.value === '') {
+			console.log('🔍 [SEARCH] Waiting for postal code to load...');
+			infItems.value = [];
+			return;
+		}
+
+		// Fetch search results (postal code will be applied if available via wrapper)
 		if (!state.initialFetchDone) {
 			const search = await searchExtendedWithCustomerPostalCode(appState, {
 				term: term || undefined,
@@ -104,7 +131,7 @@ export default component$(() => {
 			state.facetValueIds = facetParams;
 			resetInfiniteScrollState(infPage, infHasMore, infError, infItems, state.search.items || []);
 			state.initialFetchDone = true;
-			if (import.meta.env.DEV) console.log('🔍 [SEARCH] Initial postal-filtered fetch complete');
+			console.log('🔍 [SEARCH] Initial postal-filtered fetch complete');
 		} else if (state.initialFetchDone) {
 			const search = await searchExtendedWithCustomerPostalCode(appState, {
 				term: term || undefined,
@@ -112,6 +139,11 @@ export default component$(() => {
 				take: 20,
 				facetValueIds: facetParams,
 			});
+			console.log(
+				'🔍 [SEARCH] Re-fetching with postal code - got',
+				search?.items?.length || 0,
+				'items'
+			);
 			state.search = search as SearchResponse;
 			state.facedValues = groupFacetValues(search as any, facetParams);
 			state.facetValueIds = facetParams;
@@ -119,6 +151,7 @@ export default component$(() => {
 			infHasMore.value = true;
 			infError.value = null;
 			infItems.value = search.items || [];
+			console.log('🔍 [SEARCH] Updated display with postal-filtered results');
 		} else {
 			// waiting for postal code; ensure no items shown
 			infItems.value = [];
@@ -190,7 +223,14 @@ export default component$(() => {
 						{state.facetValueIds.length > 0 && ` (${state.facetValueIds.length} filters applied)`}
 					</p>
 
-					{!state.initialFetchDone ? (
+					{!customerPostalCode.value ? (
+						<div class="text-center py-12" aria-label="Postal code required">
+							<p class="text-gray-600 font-medium">📍 Postal Code Required</p>
+							<p class="text-sm text-gray-400 mt-2">
+								Please log in with a delivery address to view local products.
+							</p>
+						</div>
+					) : !state.initialFetchDone ? (
 						<div
 							class="grid grid-cols-1 gap-y-6 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8"
 							aria-label="Loading local products"

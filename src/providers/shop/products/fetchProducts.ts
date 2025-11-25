@@ -84,6 +84,19 @@ export function searchExtendedWithCustomerPostalCode(
 	}
 ) {
 	const sellerPostalCode = getActiveCustomerPostalCode(appState);
+
+	// ALWAYS log to diagnose issue
+	console.log(
+		'🏠 [WRAPPER] Postal code from appState:',
+		sellerPostalCode || '<NONE - NOT LOGGED IN OR NO ADDRESS>'
+	);
+	console.log('🏠 [WRAPPER] AppState customer ID:', appState.customer?.id);
+	console.log('🏠 [WRAPPER] AppState addressBook length:', appState.addressBook?.length);
+	console.log(
+		'🏠 [WRAPPER] Will send to backend:',
+		sellerPostalCode ? 'YES ✅' : 'NO ❌ (showing ALL products)'
+	);
+
 	// Pass postal code if available; backend handles filtering
 	return searchExtendedProducts({ ...params, ...(sellerPostalCode && { sellerPostalCode }) });
 }

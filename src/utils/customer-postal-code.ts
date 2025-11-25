@@ -14,31 +14,30 @@ export function getActiveCustomerPostalCode(appState: AppState): string {
 	// Helper to normalize postal code
 	const normalize = (code?: string) => (code ? code.trim().replace(/\s+/g, '').toUpperCase() : '');
 
-	if (import.meta.env.DEV) {
-		console.log('🏠 [POSTAL-CODE] === Checking customer postal code ===');
-		console.log('🏠 [POSTAL-CODE] Customer ID:', appState.customer?.id);
+	// ALWAYS log to diagnose issue
+	console.log('🏠 [POSTAL-CODE] === Checking customer postal code ===');
+	console.log('🏠 [POSTAL-CODE] Customer ID:', appState.customer?.id);
+	console.log(
+		'🏠 [POSTAL-CODE] Customer Name:',
+		appState.customer?.firstName,
+		appState.customer?.lastName
+	);
+	console.log(
+		'🏠 [POSTAL-CODE] Shipping Address Postal Code:',
+		appState.shippingAddress?.postalCode
+	);
+	console.log('🏠 [POSTAL-CODE] Address Book Count:', appState.addressBook?.length || 0);
+	if (appState.addressBook && appState.addressBook.length > 0) {
 		console.log(
-			'🏠 [POSTAL-CODE] Customer Name:',
-			appState.customer?.firstName,
-			appState.customer?.lastName
+			'🏠 [POSTAL-CODE] Address Book Details:',
+			appState.addressBook.map((a) => ({
+				id: a.id,
+				postalCode: a.postalCode,
+				defaultShipping: a.defaultShippingAddress,
+				defaultBilling: a.defaultBillingAddress,
+				city: a.city,
+			}))
 		);
-		console.log(
-			'🏠 [POSTAL-CODE] Shipping Address Postal Code:',
-			appState.shippingAddress?.postalCode
-		);
-		console.log('🏠 [POSTAL-CODE] Address Book Count:', appState.addressBook?.length || 0);
-		if (appState.addressBook && appState.addressBook.length > 0) {
-			console.log(
-				'🏠 [POSTAL-CODE] Address Book Details:',
-				appState.addressBook.map((a) => ({
-					id: a.id,
-					postalCode: a.postalCode,
-					defaultShipping: a.defaultShippingAddress,
-					defaultBilling: a.defaultBillingAddress,
-					city: a.city,
-				}))
-			);
-		}
 	}
 
 	// Logged-in customer
