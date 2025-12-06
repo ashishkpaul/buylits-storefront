@@ -92,6 +92,8 @@ export type ApplyCouponCodeResult =
 	| CouponCodeLimitError
 	| Order;
 
+export type ApplyPaybackResult = PaybackAppliedSuccess | PaybackError;
+
 export type Asset = Node & {
 	__typename?: 'Asset';
 	createdAt: Scalars['DateTime']['output'];
@@ -421,8 +423,12 @@ export type CreateAddressInput = {
 	streetLine2?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type CreateCustomerCustomFieldsInput = {
+	paybackBalance?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type CreateCustomerInput = {
-	customFields?: InputMaybe<Scalars['JSON']['input']>;
+	customFields?: InputMaybe<CreateCustomerCustomFieldsInput>;
 	emailAddress: Scalars['String']['input'];
 	firstName: Scalars['String']['input'];
 	lastName: Scalars['String']['input'];
@@ -431,6 +437,7 @@ export type CreateCustomerInput = {
 };
 
 export type CreateSellerCustomFieldsInput = {
+	paybackRate?: InputMaybe<Scalars['Float']['input']>;
 	sellerPostalCode?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -828,12 +835,14 @@ export type Customer = Node & {
 	__typename?: 'Customer';
 	addresses?: Maybe<Array<Address>>;
 	createdAt: Scalars['DateTime']['output'];
-	customFields?: Maybe<Scalars['JSON']['output']>;
+	customFields?: Maybe<CustomerCustomFields>;
 	emailAddress: Scalars['String']['output'];
 	firstName: Scalars['String']['output'];
 	id: Scalars['ID']['output'];
 	lastName: Scalars['String']['output'];
 	orders: OrderList;
+	paybackBalance?: Maybe<PaybackBalance>;
+	paybackTransactions: PaybackTransactionList;
 	phoneNumber?: Maybe<Scalars['String']['output']>;
 	title?: Maybe<Scalars['String']['output']>;
 	updatedAt: Scalars['DateTime']['output'];
@@ -844,6 +853,15 @@ export type CustomerOrdersArgs = {
 	options?: InputMaybe<OrderListOptions>;
 };
 
+export type CustomerPaybackTransactionsArgs = {
+	options?: InputMaybe<PaybackTransactionListOptions>;
+};
+
+export type CustomerCustomFields = {
+	__typename?: 'CustomerCustomFields';
+	paybackBalance?: Maybe<Scalars['Int']['output']>;
+};
+
 export type CustomerFilterParameter = {
 	_and?: InputMaybe<Array<CustomerFilterParameter>>;
 	_or?: InputMaybe<Array<CustomerFilterParameter>>;
@@ -852,6 +870,7 @@ export type CustomerFilterParameter = {
 	firstName?: InputMaybe<StringOperators>;
 	id?: InputMaybe<IdOperators>;
 	lastName?: InputMaybe<StringOperators>;
+	paybackBalance?: InputMaybe<NumberOperators>;
 	phoneNumber?: InputMaybe<StringOperators>;
 	title?: InputMaybe<StringOperators>;
 	updatedAt?: InputMaybe<DateOperators>;
@@ -896,6 +915,7 @@ export type CustomerSortParameter = {
 	firstName?: InputMaybe<SortOrder>;
 	id?: InputMaybe<SortOrder>;
 	lastName?: InputMaybe<SortOrder>;
+	paybackBalance?: InputMaybe<SortOrder>;
 	phoneNumber?: InputMaybe<SortOrder>;
 	title?: InputMaybe<SortOrder>;
 	updatedAt?: InputMaybe<SortOrder>;
@@ -960,6 +980,12 @@ export type DateTimeStructFieldConfig = StructField & {
 	ui?: Maybe<Scalars['JSON']['output']>;
 };
 
+export type DeleteStoredCardResult = {
+	__typename?: 'DeleteStoredCardResult';
+	message?: Maybe<Scalars['String']['output']>;
+	success: Scalars['Boolean']['output'];
+};
+
 export type DeletionResponse = {
 	__typename?: 'DeletionResponse';
 	message?: Maybe<Scalars['String']['output']>;
@@ -1017,6 +1043,7 @@ export const ErrorCode = {
 	PasswordResetTokenExpiredError: 'PASSWORD_RESET_TOKEN_EXPIRED_ERROR',
 	PasswordResetTokenInvalidError: 'PASSWORD_RESET_TOKEN_INVALID_ERROR',
 	PasswordValidationError: 'PASSWORD_VALIDATION_ERROR',
+	PaybackError: 'PAYBACK_ERROR',
 	PaymentDeclinedError: 'PAYMENT_DECLINED_ERROR',
 	PaymentFailedError: 'PAYMENT_FAILED_ERROR',
 	UnknownError: 'UNKNOWN_ERROR',
@@ -1423,6 +1450,16 @@ export type InvalidCredentialsError = ErrorResult & {
 	message: Scalars['String']['output'];
 };
 
+export type JuspayStoredCard = {
+	__typename?: 'JuspayStoredCard';
+	brand?: Maybe<Scalars['String']['output']>;
+	expiryMonth?: Maybe<Scalars['String']['output']>;
+	expiryYear?: Maybe<Scalars['String']['output']>;
+	last4?: Maybe<Scalars['String']['output']>;
+	nickname?: Maybe<Scalars['String']['output']>;
+	token: Scalars['String']['output'];
+};
+
 /**
  * @description
  * Languages in the form of a ISO 639-1 language code with optional
@@ -1815,13 +1852,15 @@ export type Mutation = {
 	adjustOrderLine: UpdateOrderItemsResult;
 	/** Applies the given coupon code to the active Order */
 	applyCouponCode: ApplyCouponCodeResult;
+	applyPaybackToOrder: ApplyPaybackResult;
 	/** Authenticates the user using a named authentication strategy */
 	authenticate: AuthenticationResult;
 	/** Create a new Customer Address */
 	createCustomerAddress: Address;
-	createStripePaymentIntent?: Maybe<Scalars['String']['output']>;
+	createStripePaymentIntent: Scalars['String']['output'];
 	/** Delete an existing Address */
 	deleteCustomerAddress: Success;
+	deleteJuspayStoredCard: DeleteStoredCardResult;
 	/**
 	 * Authenticates the user using the native authentication strategy. This mutation is an alias for authenticate({ native: { ... }})
 	 *
@@ -1866,6 +1905,7 @@ export type Mutation = {
 	 * that verification token to the Customer, which is then used to verify the change of email address.
 	 */
 	requestUpdateCustomerEmailAddress: RequestUpdateCustomerEmailAddressResult;
+	reserveWalletForOrder: ReservationResult;
 	/** Resets a Customer's password based on the provided token */
 	resetPassword: ResetPasswordResult;
 	/** Set the Customer for the Order. Required only if the Customer is not currently logged in */
@@ -1883,6 +1923,7 @@ export type Mutation = {
 	 * shipping method will apply to.
 	 */
 	setOrderShippingMethod: SetOrderShippingMethodResult;
+	topupWallet: TopupResult;
 	/**
 	 * Track a search term usage for analytics.
 	 * Call this when a user performs a search to build popular search terms.
@@ -1905,6 +1946,7 @@ export type Mutation = {
 	updateCustomerEmailAddress: UpdateCustomerEmailAddressResult;
 	/** Update the password of the active Customer */
 	updateCustomerPassword: UpdateCustomerPasswordResult;
+	updateJuspayCardNickname: UpdateCardResult;
 	/**
 	 * Verify a Customer email address with the token sent to that address. Only applicable if `authOptions.requireVerification` is set to true.
 	 *
@@ -1936,6 +1978,10 @@ export type MutationApplyCouponCodeArgs = {
 	couponCode: Scalars['String']['input'];
 };
 
+export type MutationApplyPaybackToOrderArgs = {
+	amount: Scalars['Money']['input'];
+};
+
 export type MutationAuthenticateArgs = {
 	input: AuthenticationInput;
 	rememberMe?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1947,6 +1993,10 @@ export type MutationCreateCustomerAddressArgs = {
 
 export type MutationDeleteCustomerAddressArgs = {
 	id: Scalars['ID']['input'];
+};
+
+export type MutationDeleteJuspayStoredCardArgs = {
+	cardToken: Scalars['String']['input'];
 };
 
 export type MutationLoginArgs = {
@@ -1984,6 +2034,11 @@ export type MutationRequestUpdateCustomerEmailAddressArgs = {
 	password: Scalars['String']['input'];
 };
 
+export type MutationReserveWalletForOrderArgs = {
+	amount: Scalars['Float']['input'];
+	orderId: Scalars['ID']['input'];
+};
+
 export type MutationResetPasswordArgs = {
 	password: Scalars['String']['input'];
 	token: Scalars['String']['input'];
@@ -2009,6 +2064,10 @@ export type MutationSetOrderShippingMethodArgs = {
 	shippingMethodId: Array<Scalars['ID']['input']>;
 };
 
+export type MutationTopupWalletArgs = {
+	amount: Scalars['Float']['input'];
+};
+
 export type MutationTrackSearchTermArgs = {
 	input: TrackSearchTermInput;
 };
@@ -2032,6 +2091,11 @@ export type MutationUpdateCustomerEmailAddressArgs = {
 export type MutationUpdateCustomerPasswordArgs = {
 	currentPassword: Scalars['String']['input'];
 	newPassword: Scalars['String']['input'];
+};
+
+export type MutationUpdateJuspayCardNicknameArgs = {
+	cardToken: Scalars['String']['input'];
+	nickname: Scalars['String']['input'];
 };
 
 export type MutationVerifyCustomerAccountArgs = {
@@ -2409,6 +2473,128 @@ export type PasswordValidationError = ErrorResult & {
 	validationErrorMessage: Scalars['String']['output'];
 };
 
+export type PaybackAppliedSuccess = {
+	__typename?: 'PaybackAppliedSuccess';
+	appliedAmount: Scalars['Money']['output'];
+	order: Order;
+	remainingBalance: Scalars['Money']['output'];
+};
+
+export type PaybackBalance = {
+	__typename?: 'PaybackBalance';
+	balance: Scalars['Money']['output'];
+	currencyCode: CurrencyCode;
+	lastUpdated?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type PaybackError = ErrorResult & {
+	__typename?: 'PaybackError';
+	errorCode: ErrorCode;
+	message: Scalars['String']['output'];
+};
+
+export type PaybackRule = Node & {
+	__typename?: 'PaybackRule';
+	collection?: Maybe<Collection>;
+	createdAt: Scalars['DateTime']['output'];
+	customerGroup?: Maybe<CustomerGroup>;
+	description?: Maybe<Scalars['String']['output']>;
+	enabled: Scalars['Boolean']['output'];
+	id: Scalars['ID']['output'];
+	minimumOrderValue?: Maybe<Scalars['Money']['output']>;
+	name?: Maybe<Scalars['String']['output']>;
+	paybackRate: Scalars['Float']['output'];
+	priority: Scalars['Int']['output'];
+	product?: Maybe<Product>;
+	ruleType: PaybackRuleType;
+	updatedAt: Scalars['DateTime']['output'];
+	validFrom?: Maybe<Scalars['DateTime']['output']>;
+	validTo?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type PaybackRuleList = PaginatedList & {
+	__typename?: 'PaybackRuleList';
+	items: Array<PaybackRule>;
+	totalItems: Scalars['Int']['output'];
+};
+
+export const PaybackRuleType = {
+	Collection: 'COLLECTION',
+	CustomerGroup: 'CUSTOMER_GROUP',
+	Global: 'GLOBAL',
+	Product: 'PRODUCT',
+} as const;
+
+export type PaybackRuleType = (typeof PaybackRuleType)[keyof typeof PaybackRuleType];
+export type PaybackTransaction = Node & {
+	__typename?: 'PaybackTransaction';
+	amount: Scalars['Money']['output'];
+	createdAt: Scalars['DateTime']['output'];
+	currencyCode: CurrencyCode;
+	description: Scalars['String']['output'];
+	expiresAt?: Maybe<Scalars['DateTime']['output']>;
+	id: Scalars['ID']['output'];
+	order?: Maybe<Order>;
+	processed: Scalars['Boolean']['output'];
+	referenceId?: Maybe<Scalars['String']['output']>;
+	type: PaybackTransactionType;
+	updatedAt: Scalars['DateTime']['output'];
+};
+
+export type PaybackTransactionFilterParameter = {
+	_and?: InputMaybe<Array<PaybackTransactionFilterParameter>>;
+	_or?: InputMaybe<Array<PaybackTransactionFilterParameter>>;
+	amount?: InputMaybe<NumberOperators>;
+	createdAt?: InputMaybe<DateOperators>;
+	currencyCode?: InputMaybe<StringOperators>;
+	description?: InputMaybe<StringOperators>;
+	expiresAt?: InputMaybe<DateOperators>;
+	id?: InputMaybe<IdOperators>;
+	processed?: InputMaybe<BooleanOperators>;
+	referenceId?: InputMaybe<StringOperators>;
+	type?: InputMaybe<StringOperators>;
+	updatedAt?: InputMaybe<DateOperators>;
+};
+
+export type PaybackTransactionList = PaginatedList & {
+	__typename?: 'PaybackTransactionList';
+	items: Array<PaybackTransaction>;
+	totalItems: Scalars['Int']['output'];
+};
+
+export type PaybackTransactionListOptions = {
+	/** Allows the results to be filtered */
+	filter?: InputMaybe<PaybackTransactionFilterParameter>;
+	/** Specifies whether multiple top-level "filter" fields should be combined with a logical AND or OR operation. Defaults to AND. */
+	filterOperator?: InputMaybe<LogicalOperator>;
+	/** Skips the first n results, for use in pagination */
+	skip?: InputMaybe<Scalars['Int']['input']>;
+	/** Specifies which properties to sort the results by */
+	sort?: InputMaybe<PaybackTransactionSortParameter>;
+	/** Takes n results, for use in pagination */
+	take?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type PaybackTransactionSortParameter = {
+	amount?: InputMaybe<SortOrder>;
+	createdAt?: InputMaybe<SortOrder>;
+	description?: InputMaybe<SortOrder>;
+	expiresAt?: InputMaybe<SortOrder>;
+	id?: InputMaybe<SortOrder>;
+	referenceId?: InputMaybe<SortOrder>;
+	updatedAt?: InputMaybe<SortOrder>;
+};
+
+export const PaybackTransactionType = {
+	Adjusted: 'ADJUSTED',
+	Earned: 'EARNED',
+	Expired: 'EXPIRED',
+	Redeemed: 'REDEEMED',
+	Refunded: 'REFUNDED',
+} as const;
+
+export type PaybackTransactionType =
+	(typeof PaybackTransactionType)[keyof typeof PaybackTransactionType];
 export type Payment = Node & {
 	__typename?: 'Payment';
 	amount: Scalars['Money']['output'];
@@ -2611,6 +2797,8 @@ export const Permission = {
 	DeleteTaxRate: 'DeleteTaxRate',
 	/** Grants permission to delete Zone */
 	DeleteZone: 'DeleteZone',
+	/** Allows administrator to export orders */
+	ExportOrders: 'ExportOrders',
 	/** Owner means the user owns this entity, e.g. a Customer's own Order */
 	Owner: 'Owner',
 	/** Public means any unauthenticated user may perform the operation */
@@ -2659,6 +2847,8 @@ export const Permission = {
 	ReadTaxRate: 'ReadTaxRate',
 	/** Grants permission to read Zone */
 	ReadZone: 'ReadZone',
+	/** Allows setting a webhook URL */
+	SetWebhook: 'SetWebhook',
 	/** SuperAdmin has unrestricted access to all operations */
 	SuperAdmin: 'SuperAdmin',
 	/** Grants permission to update Administrator */
@@ -2743,15 +2933,17 @@ export type Product = Node & {
 	assets: Array<Asset>;
 	collections: Array<Collection>;
 	createdAt: Scalars['DateTime']['output'];
-	customFields?: Maybe<Scalars['JSON']['output']>;
+	customFields?: Maybe<ProductCustomFields>;
 	description: Scalars['String']['output'];
 	enabled: Scalars['Boolean']['output'];
+	estimatedPayback?: Maybe<Scalars['Money']['output']>;
 	facetValues: Array<FacetValue>;
 	featuredAsset?: Maybe<Asset>;
 	id: Scalars['ID']['output'];
 	languageCode: LanguageCode;
 	name: Scalars['String']['output'];
 	optionGroups: Array<ProductOptionGroup>;
+	paybackRate?: Maybe<Scalars['Float']['output']>;
 	productSellerInfo?: Maybe<Seller>;
 	slug: Scalars['String']['output'];
 	translations: Array<ProductTranslation>;
@@ -2762,8 +2954,17 @@ export type Product = Node & {
 	variants: Array<ProductVariant>;
 };
 
+export type ProductEstimatedPaybackArgs = {
+	quantity?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type ProductVariantListArgs = {
 	options?: InputMaybe<ProductVariantListOptions>;
+};
+
+export type ProductCustomFields = {
+	__typename?: 'ProductCustomFields';
+	excludeFromPayback?: Maybe<Scalars['Boolean']['output']>;
 };
 
 export type ProductFilterParameter = {
@@ -2772,9 +2973,12 @@ export type ProductFilterParameter = {
 	createdAt?: InputMaybe<DateOperators>;
 	description?: InputMaybe<StringOperators>;
 	enabled?: InputMaybe<BooleanOperators>;
+	estimatedPayback?: InputMaybe<NumberOperators>;
+	excludeFromPayback?: InputMaybe<BooleanOperators>;
 	id?: InputMaybe<IdOperators>;
 	languageCode?: InputMaybe<StringOperators>;
 	name?: InputMaybe<StringOperators>;
+	paybackRate?: InputMaybe<NumberOperators>;
 	slug?: InputMaybe<StringOperators>;
 	updatedAt?: InputMaybe<DateOperators>;
 };
@@ -2846,8 +3050,11 @@ export type ProductOptionTranslation = {
 export type ProductSortParameter = {
 	createdAt?: InputMaybe<SortOrder>;
 	description?: InputMaybe<SortOrder>;
+	estimatedPayback?: InputMaybe<SortOrder>;
+	excludeFromPayback?: InputMaybe<SortOrder>;
 	id?: InputMaybe<SortOrder>;
 	name?: InputMaybe<SortOrder>;
+	paybackRate?: InputMaybe<SortOrder>;
 	slug?: InputMaybe<SortOrder>;
 	updatedAt?: InputMaybe<SortOrder>;
 };
@@ -3062,8 +3269,13 @@ export type Query = {
 	/** A list of Facets available to the shop */
 	facets: FacetList;
 	generateBraintreeClientToken?: Maybe<Scalars['String']['output']>;
+	getJuspayPaymentLink?: Maybe<Scalars['String']['output']>;
+	getJuspayPaymentMethods?: Maybe<Scalars['JSON']['output']>;
+	getJuspayStoredCards: Array<JuspayStoredCard>;
 	/** Returns information about the current authenticated User */
 	me?: Maybe<CurrentUser>;
+	myWalletBalance: Scalars['Float']['output'];
+	myWalletTransactions: Array<WalletTransaction>;
 	/** Returns the possible next states that the activeOrder can transition to */
 	nextOrderStates: Array<Scalars['String']['output']>;
 	/**
@@ -3094,6 +3306,7 @@ export type Query = {
 	 * Provides autocomplete/typeahead functionality for the storefront.
 	 */
 	searchSuggestions: SearchSuggestionsResponse;
+	verifyVpa?: Maybe<Scalars['JSON']['output']>;
 };
 
 export type QueryCollectionArgs = {
@@ -3116,6 +3329,23 @@ export type QueryFacetsArgs = {
 export type QueryGenerateBraintreeClientTokenArgs = {
 	includeCustomerId?: InputMaybe<Scalars['Boolean']['input']>;
 	orderId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type QueryGetJuspayPaymentLinkArgs = {
+	orderCode: Scalars['String']['input'];
+};
+
+export type QueryGetJuspayPaymentMethodsArgs = {
+	customerId?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryGetJuspayStoredCardsArgs = {
+	customerId: Scalars['String']['input'];
+};
+
+export type QueryMyWalletTransactionsArgs = {
+	limit?: InputMaybe<Scalars['Int']['input']>;
+	skip?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryOrderArgs = {
@@ -3145,6 +3375,10 @@ export type QuerySearchArgs = {
 
 export type QuerySearchSuggestionsArgs = {
 	input: SearchSuggestionsInput;
+};
+
+export type QueryVerifyVpaArgs = {
+	vpa: Scalars['String']['input'];
 };
 
 export type RefreshCustomerVerificationResult = NativeAuthStrategyError | Success;
@@ -3206,7 +3440,12 @@ export type RegisterCustomerAccountResult =
 	| PasswordValidationError
 	| Success;
 
+export type RegisterCustomerCustomFieldsInput = {
+	paybackBalance?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type RegisterCustomerInput = {
+	customFields?: InputMaybe<RegisterCustomerCustomFieldsInput>;
 	emailAddress: Scalars['String']['input'];
 	firstName?: InputMaybe<Scalars['String']['input']>;
 	lastName?: InputMaybe<Scalars['String']['input']>;
@@ -3247,6 +3486,12 @@ export type RequestUpdateCustomerEmailAddressResult =
 	| InvalidCredentialsError
 	| NativeAuthStrategyError
 	| Success;
+
+export type ReservationResult = {
+	__typename?: 'ReservationResult';
+	message?: Maybe<Scalars['String']['output']>;
+	success: Scalars['Boolean']['output'];
+};
 
 export type ResetPasswordResult =
 	| CurrentUser
@@ -3411,6 +3656,7 @@ export type Seller = Node & {
 
 export type SellerCustomFields = {
 	__typename?: 'SellerCustomFields';
+	paybackRate?: Maybe<Scalars['Float']['output']>;
 	sellerPostalCode?: Maybe<Scalars['String']['output']>;
 };
 
@@ -3688,6 +3934,13 @@ export type TextStructFieldConfig = StructField & {
 	ui?: Maybe<Scalars['JSON']['output']>;
 };
 
+export type TopupResult = {
+	__typename?: 'TopupResult';
+	message?: Maybe<Scalars['String']['output']>;
+	redirectUrl?: Maybe<Scalars['String']['output']>;
+	success: Scalars['Boolean']['output'];
+};
+
 export type TrackSearchTermInput = {
 	/** Source of the search (e.g., "autocomplete", "manual", "voice") */
 	source?: InputMaybe<Scalars['String']['input']>;
@@ -3695,6 +3948,20 @@ export type TrackSearchTermInput = {
 	term: Scalars['String']['input'];
 };
 
+export const TransactionStatus = {
+	Failed: 'FAILED',
+	Pending: 'PENDING',
+	Reversed: 'REVERSED',
+	Settled: 'SETTLED',
+} as const;
+
+export type TransactionStatus = (typeof TransactionStatus)[keyof typeof TransactionStatus];
+export const TransactionType = {
+	Credit: 'CREDIT',
+	Debit: 'DEBIT',
+} as const;
+
+export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType];
 export type TransitionOrderToStateResult = Order | OrderStateTransitionError;
 
 /**
@@ -3720,6 +3987,17 @@ export type UpdateAddressInput = {
 	streetLine2?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateCardResult = {
+	__typename?: 'UpdateCardResult';
+	card?: Maybe<JuspayStoredCard>;
+	message?: Maybe<Scalars['String']['output']>;
+	success: Scalars['Boolean']['output'];
+};
+
+export type UpdateCustomerCustomFieldsInput = {
+	paybackBalance?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type UpdateCustomerEmailAddressResult =
 	| IdentifierChangeTokenExpiredError
 	| IdentifierChangeTokenInvalidError
@@ -3727,7 +4005,7 @@ export type UpdateCustomerEmailAddressResult =
 	| Success;
 
 export type UpdateCustomerInput = {
-	customFields?: InputMaybe<Scalars['JSON']['input']>;
+	customFields?: InputMaybe<UpdateCustomerCustomFieldsInput>;
 	firstName?: InputMaybe<Scalars['String']['input']>;
 	lastName?: InputMaybe<Scalars['String']['input']>;
 	phoneNumber?: InputMaybe<Scalars['String']['input']>;
@@ -3811,6 +4089,20 @@ export type VerifyCustomerAccountResult =
 	| PasswordValidationError
 	| VerificationTokenExpiredError
 	| VerificationTokenInvalidError;
+
+export type WalletTransaction = Node & {
+	__typename?: 'WalletTransaction';
+	amount: Scalars['Float']['output'];
+	createdAt: Scalars['DateTime']['output'];
+	description?: Maybe<Scalars['String']['output']>;
+	externalReference?: Maybe<Scalars['String']['output']>;
+	id: Scalars['ID']['output'];
+	orderId?: Maybe<Scalars['String']['output']>;
+	status: TransactionStatus;
+	type: TransactionType;
+	updatedAt: Scalars['DateTime']['output'];
+	walletId: Scalars['String']['output'];
+};
 
 export type Zone = Node & {
 	__typename?: 'Zone';
@@ -4262,7 +4554,7 @@ export type CreateStripePaymentIntentMutationVariables = Exact<{ [key: string]: 
 
 export type CreateStripePaymentIntentMutation = {
 	__typename?: 'Mutation';
-	createStripePaymentIntent?: string | null;
+	createStripePaymentIntent: string;
 };
 
 export type GenerateBraintreeClientTokenQueryVariables = Exact<{
@@ -4599,6 +4891,12 @@ type ErrorResult_PasswordValidationError_Fragment = {
 	message: string;
 };
 
+type ErrorResult_PaybackError_Fragment = {
+	__typename: 'PaybackError';
+	errorCode: ErrorCode;
+	message: string;
+};
+
 type ErrorResult_PaymentDeclinedError_Fragment = {
 	__typename: 'PaymentDeclinedError';
 	errorCode: ErrorCode;
@@ -4650,6 +4948,7 @@ export type ErrorResultFragment =
 	| ErrorResult_PasswordResetTokenExpiredError_Fragment
 	| ErrorResult_PasswordResetTokenInvalidError_Fragment
 	| ErrorResult_PasswordValidationError_Fragment
+	| ErrorResult_PaybackError_Fragment
 	| ErrorResult_PaymentDeclinedError_Fragment
 	| ErrorResult_PaymentFailedError_Fragment
 	| ErrorResult_VerificationTokenExpiredError_Fragment

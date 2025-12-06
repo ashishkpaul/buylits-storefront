@@ -60,6 +60,8 @@ union ApplyCouponCodeResult =
 	| CouponCodeLimitError
 	| Order
 
+union ApplyPaybackResult = PaybackAppliedSuccess | PaybackError
+
 type Asset implements Node {
 	createdAt: DateTime!
 	customFields: JSON
@@ -394,8 +396,12 @@ input CreateAddressInput {
 	streetLine2: String
 }
 
+input CreateCustomerCustomFieldsInput {
+	paybackBalance: Int
+}
+
 input CreateCustomerInput {
-	customFields: JSON
+	customFields: CreateCustomerCustomFieldsInput
 	emailAddress: String!
 	firstName: String!
 	lastName: String!
@@ -404,6 +410,7 @@ input CreateCustomerInput {
 }
 
 input CreateSellerCustomFieldsInput {
+	paybackRate: Float
 	sellerPostalCode: String
 }
 
@@ -1265,16 +1272,22 @@ type CustomProductVariantMappings {
 type Customer implements Node {
 	addresses: [Address!]
 	createdAt: DateTime!
-	customFields: JSON
+	customFields: CustomerCustomFields
 	emailAddress: String!
 	firstName: String!
 	id: ID!
 	lastName: String!
 	orders(options: OrderListOptions): OrderList!
+	paybackBalance: PaybackBalance
+	paybackTransactions(options: PaybackTransactionListOptions): PaybackTransactionList!
 	phoneNumber: String
 	title: String
 	updatedAt: DateTime!
 	user: User
+}
+
+type CustomerCustomFields {
+	paybackBalance: Int
 }
 
 input CustomerFilterParameter {
@@ -1285,6 +1298,7 @@ input CustomerFilterParameter {
 	firstName: StringOperators
 	id: IDOperators
 	lastName: StringOperators
+	paybackBalance: NumberOperators
 	phoneNumber: StringOperators
 	title: StringOperators
 	updatedAt: DateOperators
@@ -1337,6 +1351,7 @@ input CustomerSortParameter {
 	firstName: SortOrder
 	id: SortOrder
 	lastName: SortOrder
+	paybackBalance: SortOrder
 	phoneNumber: SortOrder
 	title: SortOrder
 	updatedAt: SortOrder
@@ -1408,6 +1423,11 @@ type DateTimeStructFieldConfig implements StructField {
 	ui: JSON
 }
 
+type DeleteStoredCardResult {
+	message: String
+	success: Boolean!
+}
+
 type DeletionResponse {
 	message: String
 	result: DeletionResult!
@@ -1468,6 +1488,7 @@ enum ErrorCode {
 	PASSWORD_RESET_TOKEN_EXPIRED_ERROR
 	PASSWORD_RESET_TOKEN_INVALID_ERROR
 	PASSWORD_VALIDATION_ERROR
+	PAYBACK_ERROR
 	PAYMENT_DECLINED_ERROR
 	PAYMENT_FAILED_ERROR
 	UNKNOWN_ERROR
@@ -1907,6 +1928,15 @@ type InvalidCredentialsError implements ErrorResult {
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
 """
 scalar JSON
+
+type JuspayStoredCard {
+	brand: String
+	expiryMonth: String
+	expiryYear: String
+	last4: String
+	nickname: String
+	token: String!
+}
 
 """
 @description
@@ -2784,6 +2814,7 @@ type Mutation {
 	Applies the given coupon code to the active Order
 	"""
 	applyCouponCode(couponCode: String!): ApplyCouponCodeResult!
+	applyPaybackToOrder(amount: Money!): ApplyPaybackResult!
 
 	"""
 	Authenticates the user using a named authentication strategy
@@ -2794,12 +2825,13 @@ type Mutation {
 	Create a new Customer Address
 	"""
 	createCustomerAddress(input: CreateAddressInput!): Address!
-	createStripePaymentIntent: String
+	createStripePaymentIntent: String!
 
 	"""
 	Delete an existing Address
 	"""
 	deleteCustomerAddress(id: ID!): Success!
+	deleteJuspayStoredCard(cardToken: String!): DeleteStoredCardResult!
 
 	"""
 	Authenticates the user using the native authentication strategy. This mutation is an alias for authenticate({ native: { ... }})
@@ -2868,6 +2900,7 @@ type Mutation {
 		newEmailAddress: String!
 		password: String!
 	): RequestUpdateCustomerEmailAddressResult!
+	reserveWalletForOrder(amount: Float!, orderId: ID!): ReservationResult!
 
 	"""
 	Resets a Customer's password based on the provided token
@@ -2901,6 +2934,7 @@ type Mutation {
 	shipping method will apply to.
 	"""
 	setOrderShippingMethod(shippingMethodId: [ID!]!): SetOrderShippingMethodResult!
+	topupWallet(amount: Float!): TopupResult!
 
 	"""
 	Track a search term usage for analytics.
@@ -2946,6 +2980,7 @@ type Mutation {
 		currentPassword: String!
 		newPassword: String!
 	): UpdateCustomerPasswordResult!
+	updateJuspayCardNickname(cardToken: String!, nickname: String!): UpdateCardResult!
 
 	"""
 	Verify a Customer email address with the token sent to that address. Only applicable if `authOptions.requireVerification` is set to true.
@@ -3421,6 +3456,132 @@ type PasswordValidationError implements ErrorResult {
 	validationErrorMessage: String!
 }
 
+type PaybackAppliedSuccess {
+	appliedAmount: Money!
+	order: Order!
+	remainingBalance: Money!
+}
+
+type PaybackBalance {
+	balance: Money!
+	currencyCode: CurrencyCode!
+	lastUpdated: DateTime
+}
+
+type PaybackError implements ErrorResult {
+	errorCode: ErrorCode!
+	message: String!
+}
+
+type PaybackRule implements Node {
+	collection: Collection
+	createdAt: DateTime!
+	customerGroup: CustomerGroup
+	description: String
+	enabled: Boolean!
+	id: ID!
+	minimumOrderValue: Money
+	name: String
+	paybackRate: Float!
+	priority: Int!
+	product: Product
+	ruleType: PaybackRuleType!
+	updatedAt: DateTime!
+	validFrom: DateTime
+	validTo: DateTime
+}
+
+type PaybackRuleList implements PaginatedList {
+	items: [PaybackRule!]!
+	totalItems: Int!
+}
+
+enum PaybackRuleType {
+	COLLECTION
+	CUSTOMER_GROUP
+	GLOBAL
+	PRODUCT
+}
+
+type PaybackTransaction implements Node {
+	amount: Money!
+	createdAt: DateTime!
+	currencyCode: CurrencyCode!
+	description: String!
+	expiresAt: DateTime
+	id: ID!
+	order: Order
+	processed: Boolean!
+	referenceId: String
+	type: PaybackTransactionType!
+	updatedAt: DateTime!
+}
+
+input PaybackTransactionFilterParameter {
+	_and: [PaybackTransactionFilterParameter!]
+	_or: [PaybackTransactionFilterParameter!]
+	amount: NumberOperators
+	createdAt: DateOperators
+	currencyCode: StringOperators
+	description: StringOperators
+	expiresAt: DateOperators
+	id: IDOperators
+	processed: BooleanOperators
+	referenceId: StringOperators
+	type: StringOperators
+	updatedAt: DateOperators
+}
+
+type PaybackTransactionList implements PaginatedList {
+	items: [PaybackTransaction!]!
+	totalItems: Int!
+}
+
+input PaybackTransactionListOptions {
+	"""
+	Allows the results to be filtered
+	"""
+	filter: PaybackTransactionFilterParameter
+
+	"""
+	Specifies whether multiple top-level "filter" fields should be combined with a logical AND or OR operation. Defaults to AND.
+	"""
+	filterOperator: LogicalOperator
+
+	"""
+	Skips the first n results, for use in pagination
+	"""
+	skip: Int
+
+	"""
+	Specifies which properties to sort the results by
+	"""
+	sort: PaybackTransactionSortParameter
+
+	"""
+	Takes n results, for use in pagination
+	"""
+	take: Int
+}
+
+input PaybackTransactionSortParameter {
+	amount: SortOrder
+	createdAt: SortOrder
+	description: SortOrder
+	expiresAt: SortOrder
+	id: SortOrder
+	referenceId: SortOrder
+	updatedAt: SortOrder
+}
+
+enum PaybackTransactionType {
+	ADJUSTED
+	EARNED
+	EXPIRED
+	REDEEMED
+	REFUNDED
+}
+
 type Payment implements Node {
 	amount: Money!
 	createdAt: DateTime!
@@ -3762,6 +3923,11 @@ enum Permission {
 	DeleteZone
 
 	"""
+	Allows administrator to export orders
+	"""
+	ExportOrders
+
+	"""
 	Owner means the user owns this entity, e.g. a Customer's own Order
 	"""
 	Owner
@@ -3880,6 +4046,11 @@ enum Permission {
 	Grants permission to read Zone
 	"""
 	ReadZone
+
+	"""
+	Allows setting a webhook URL
+	"""
+	SetWebhook
 
 	"""
 	SuperAdmin has unrestricted access to all operations
@@ -4041,15 +4212,17 @@ type Product implements Node {
 	assets: [Asset!]!
 	collections: [Collection!]!
 	createdAt: DateTime!
-	customFields: JSON
+	customFields: ProductCustomFields
 	description: String!
 	enabled: Boolean!
+	estimatedPayback(quantity: Int = 1): Money
 	facetValues: [FacetValue!]!
 	featuredAsset: Asset
 	id: ID!
 	languageCode: LanguageCode!
 	name: String!
 	optionGroups: [ProductOptionGroup!]!
+	paybackRate: Float
 	productSellerInfo: Seller
 	slug: String!
 	translations: [ProductTranslation!]!
@@ -4066,15 +4239,22 @@ type Product implements Node {
 	variants: [ProductVariant!]!
 }
 
+type ProductCustomFields {
+	excludeFromPayback: Boolean
+}
+
 input ProductFilterParameter {
 	_and: [ProductFilterParameter!]
 	_or: [ProductFilterParameter!]
 	createdAt: DateOperators
 	description: StringOperators
 	enabled: BooleanOperators
+	estimatedPayback: NumberOperators
+	excludeFromPayback: BooleanOperators
 	id: IDOperators
 	languageCode: StringOperators
 	name: StringOperators
+	paybackRate: NumberOperators
 	slug: StringOperators
 	updatedAt: DateOperators
 }
@@ -4155,8 +4335,11 @@ type ProductOptionTranslation {
 input ProductSortParameter {
 	createdAt: SortOrder
 	description: SortOrder
+	estimatedPayback: SortOrder
+	excludeFromPayback: SortOrder
 	id: SortOrder
 	name: SortOrder
+	paybackRate: SortOrder
 	slug: SortOrder
 	updatedAt: SortOrder
 }
@@ -4404,11 +4587,16 @@ type Query {
 	"""
 	facets(options: FacetListOptions): FacetList!
 	generateBraintreeClientToken(includeCustomerId: Boolean, orderId: ID): String
+	getJuspayPaymentLink(orderCode: String!): String
+	getJuspayPaymentMethods(customerId: String): JSON
+	getJuspayStoredCards(customerId: String!): [JuspayStoredCard!]!
 
 	"""
 	Returns information about the current authenticated User
 	"""
 	me: CurrentUser
+	myWalletBalance: Float!
+	myWalletTransactions(limit: Int, skip: Int): [WalletTransaction!]!
 
 	"""
 	Returns the possible next states that the activeOrder can transition to
@@ -4455,6 +4643,7 @@ type Query {
 	Provides autocomplete/typeahead functionality for the storefront.
 	"""
 	searchSuggestions(input: SearchSuggestionsInput!): SearchSuggestionsResponse!
+	verifyVpa(vpa: String!): JSON
 }
 
 union RefreshCustomerVerificationResult = NativeAuthStrategyError | Success
@@ -4513,7 +4702,12 @@ union RegisterCustomerAccountResult =
 	| PasswordValidationError
 	| Success
 
+input RegisterCustomerCustomFieldsInput {
+	paybackBalance: Int
+}
+
 input RegisterCustomerInput {
+	customFields: RegisterCustomerCustomFieldsInput
 	emailAddress: String!
 	firstName: String
 	lastName: String
@@ -4553,6 +4747,11 @@ union RequestUpdateCustomerEmailAddressResult =
 	| InvalidCredentialsError
 	| NativeAuthStrategyError
 	| Success
+
+type ReservationResult {
+	message: String
+	success: Boolean!
+}
 
 union ResetPasswordResult =
 	| CurrentUser
@@ -4753,6 +4952,7 @@ type Seller implements Node {
 }
 
 type SellerCustomFields {
+	paybackRate: Float
 	sellerPostalCode: String
 }
 
@@ -5019,6 +5219,12 @@ type TextStructFieldConfig implements StructField {
 	ui: JSON
 }
 
+type TopupResult {
+	message: String
+	redirectUrl: String
+	success: Boolean!
+}
+
 input TrackSearchTermInput {
 	"""
 	Source of the search (e.g., "autocomplete", "manual", "voice")
@@ -5029,6 +5235,18 @@ input TrackSearchTermInput {
 	The search term that was used
 	"""
 	term: String!
+}
+
+enum TransactionStatus {
+	FAILED
+	PENDING
+	REVERSED
+	SETTLED
+}
+
+enum TransactionType {
+	CREDIT
+	DEBIT
 }
 
 union TransitionOrderToStateResult = Order | OrderStateTransitionError
@@ -5056,6 +5274,16 @@ input UpdateAddressInput {
 	streetLine2: String
 }
 
+type UpdateCardResult {
+	card: JuspayStoredCard
+	message: String
+	success: Boolean!
+}
+
+input UpdateCustomerCustomFieldsInput {
+	paybackBalance: Int
+}
+
 union UpdateCustomerEmailAddressResult =
 	| IdentifierChangeTokenExpiredError
 	| IdentifierChangeTokenInvalidError
@@ -5063,7 +5291,7 @@ union UpdateCustomerEmailAddressResult =
 	| Success
 
 input UpdateCustomerInput {
-	customFields: JSON
+	customFields: UpdateCustomerCustomFieldsInput
 	firstName: String
 	lastName: String
 	phoneNumber: String
@@ -5150,6 +5378,19 @@ union VerifyCustomerAccountResult =
 	| PasswordValidationError
 	| VerificationTokenExpiredError
 	| VerificationTokenInvalidError
+
+type WalletTransaction implements Node {
+	amount: Float!
+	createdAt: DateTime!
+	description: String
+	externalReference: String
+	id: ID!
+	orderId: String
+	status: TransactionStatus!
+	type: TransactionType!
+	updatedAt: DateTime!
+	walletId: String!
+}
 
 type Zone implements Node {
 	createdAt: DateTime!
