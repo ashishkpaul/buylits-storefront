@@ -5846,6 +5846,75 @@ export type OrderByCodeQuery = {
 	} | null;
 };
 
+export type GetJuspayPaymentLinkQueryVariables = Exact<{
+	orderCode: Scalars['String']['input'];
+}>;
+
+export type GetJuspayPaymentLinkQuery = {
+	__typename?: 'Query';
+	getJuspayPaymentLink?: string | null;
+};
+
+export type GetJuspayPaymentMethodsQueryVariables = Exact<{
+	customerId?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetJuspayPaymentMethodsQuery = {
+	__typename?: 'Query';
+	getJuspayPaymentMethods?: any | null;
+};
+
+export type VerifyVpaQueryVariables = Exact<{
+	vpa: Scalars['String']['input'];
+}>;
+
+export type VerifyVpaQuery = { __typename?: 'Query'; verifyVpa?: any | null };
+
+export type GetJuspayStoredCardsQueryVariables = Exact<{
+	customerId: Scalars['String']['input'];
+}>;
+
+export type GetJuspayStoredCardsQuery = {
+	__typename?: 'Query';
+	getJuspayStoredCards: Array<{
+		__typename?: 'JuspayStoredCard';
+		token: string;
+		last4?: string | null;
+		brand?: string | null;
+		expiryMonth?: string | null;
+		expiryYear?: string | null;
+		nickname?: string | null;
+	}>;
+};
+
+export type DeleteJuspayStoredCardMutationVariables = Exact<{
+	cardToken: Scalars['String']['input'];
+}>;
+
+export type DeleteJuspayStoredCardMutation = {
+	__typename?: 'Mutation';
+	deleteJuspayStoredCard: {
+		__typename?: 'DeleteStoredCardResult';
+		success: boolean;
+		message?: string | null;
+	};
+};
+
+export type UpdateJuspayCardNicknameMutationVariables = Exact<{
+	cardToken: Scalars['String']['input'];
+	nickname: Scalars['String']['input'];
+}>;
+
+export type UpdateJuspayCardNicknameMutation = {
+	__typename?: 'Mutation';
+	updateJuspayCardNickname: {
+		__typename?: 'UpdateCardResult';
+		success: boolean;
+		message?: string | null;
+		card?: { __typename?: 'JuspayStoredCard'; token: string; nickname?: string | null } | null;
+	};
+};
+
 export type DetailedProductFragment = {
 	__typename?: 'Product';
 	id: string;
@@ -6691,6 +6760,53 @@ export const OrderByCodeDocument = gql`
 	}
 	${OrderDetailFragmentDoc}
 `;
+export const GetJuspayPaymentLinkDocument = gql`
+	query GetJuspayPaymentLink($orderCode: String!) {
+		getJuspayPaymentLink(orderCode: $orderCode)
+	}
+`;
+export const GetJuspayPaymentMethodsDocument = gql`
+	query GetJuspayPaymentMethods($customerId: String) {
+		getJuspayPaymentMethods(customerId: $customerId)
+	}
+`;
+export const VerifyVpaDocument = gql`
+	query VerifyVpa($vpa: String!) {
+		verifyVpa(vpa: $vpa)
+	}
+`;
+export const GetJuspayStoredCardsDocument = gql`
+	query GetJuspayStoredCards($customerId: String!) {
+		getJuspayStoredCards(customerId: $customerId) {
+			token
+			last4
+			brand
+			expiryMonth
+			expiryYear
+			nickname
+		}
+	}
+`;
+export const DeleteJuspayStoredCardDocument = gql`
+	mutation DeleteJuspayStoredCard($cardToken: String!) {
+		deleteJuspayStoredCard(cardToken: $cardToken) {
+			success
+			message
+		}
+	}
+`;
+export const UpdateJuspayCardNicknameDocument = gql`
+	mutation UpdateJuspayCardNickname($cardToken: String!, $nickname: String!) {
+		updateJuspayCardNickname(cardToken: $cardToken, nickname: $nickname) {
+			success
+			message
+			card {
+				token
+				nickname
+			}
+		}
+	}
+`;
 export const ProductDocument = gql`
 	query product($slug: String, $id: ID) {
 		product(slug: $slug, id: $id) {
@@ -7110,6 +7226,63 @@ export function getSdk<C>(requester: Requester<C>) {
 				variables,
 				options
 			) as Promise<OrderByCodeQuery>;
+		},
+		GetJuspayPaymentLink(
+			variables: GetJuspayPaymentLinkQueryVariables,
+			options?: C
+		): Promise<GetJuspayPaymentLinkQuery> {
+			return requester<GetJuspayPaymentLinkQuery, GetJuspayPaymentLinkQueryVariables>(
+				GetJuspayPaymentLinkDocument,
+				variables,
+				options
+			) as Promise<GetJuspayPaymentLinkQuery>;
+		},
+		GetJuspayPaymentMethods(
+			variables?: GetJuspayPaymentMethodsQueryVariables,
+			options?: C
+		): Promise<GetJuspayPaymentMethodsQuery> {
+			return requester<GetJuspayPaymentMethodsQuery, GetJuspayPaymentMethodsQueryVariables>(
+				GetJuspayPaymentMethodsDocument,
+				variables,
+				options
+			) as Promise<GetJuspayPaymentMethodsQuery>;
+		},
+		VerifyVpa(variables: VerifyVpaQueryVariables, options?: C): Promise<VerifyVpaQuery> {
+			return requester<VerifyVpaQuery, VerifyVpaQueryVariables>(
+				VerifyVpaDocument,
+				variables,
+				options
+			) as Promise<VerifyVpaQuery>;
+		},
+		GetJuspayStoredCards(
+			variables: GetJuspayStoredCardsQueryVariables,
+			options?: C
+		): Promise<GetJuspayStoredCardsQuery> {
+			return requester<GetJuspayStoredCardsQuery, GetJuspayStoredCardsQueryVariables>(
+				GetJuspayStoredCardsDocument,
+				variables,
+				options
+			) as Promise<GetJuspayStoredCardsQuery>;
+		},
+		DeleteJuspayStoredCard(
+			variables: DeleteJuspayStoredCardMutationVariables,
+			options?: C
+		): Promise<DeleteJuspayStoredCardMutation> {
+			return requester<DeleteJuspayStoredCardMutation, DeleteJuspayStoredCardMutationVariables>(
+				DeleteJuspayStoredCardDocument,
+				variables,
+				options
+			) as Promise<DeleteJuspayStoredCardMutation>;
+		},
+		UpdateJuspayCardNickname(
+			variables: UpdateJuspayCardNicknameMutationVariables,
+			options?: C
+		): Promise<UpdateJuspayCardNicknameMutation> {
+			return requester<UpdateJuspayCardNicknameMutation, UpdateJuspayCardNicknameMutationVariables>(
+				UpdateJuspayCardNicknameDocument,
+				variables,
+				options
+			) as Promise<UpdateJuspayCardNicknameMutation>;
 		},
 		product(variables?: ProductQueryVariables, options?: C): Promise<ProductQuery> {
 			return requester<ProductQuery, ProductQueryVariables>(

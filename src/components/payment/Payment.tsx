@@ -1,12 +1,15 @@
-import { $, component$, QRL, useSignal, useVisibleTask$ } from '@qwik.dev/core';
+import { component$, QRL, useSignal, useVisibleTask$, $, useContext } from '@qwik.dev/core';
 import { getEligiblePaymentMethodsQuery } from '~/providers/shop/checkout/checkout';
 import { EligiblePaymentMethods } from '~/types';
+import { APP_STATE } from '~/constants';
 import CreditCardIcon from '../icons/CreditCardIcon';
 import BraintreePayment from './BraintreePayment';
 import StripePayment from './StripePayment';
+import JuspayPayment from './JuspayPayment';
 import { _ } from 'compiled-i18n';
 
 export default component$<{ onForward$: QRL<() => void> }>(({ onForward$ }) => {
+	const appState = useContext(APP_STATE);
 	const paymentMethods = useSignal<EligiblePaymentMethods[]>();
 
 	useVisibleTask$(async () => {
@@ -35,6 +38,13 @@ export default component$<{ onForward$: QRL<() => void> }>(({ onForward$ }) => {
 					)}
 					{method.code.includes('stripe') && <StripePayment />}
 					{method.code.includes('braintree') && <BraintreePayment />}
+					{method.code.includes('juspay') && appState.activeOrder && (
+						<JuspayPayment
+							orderCode={appState.activeOrder.code}
+							amount={appState.activeOrder.totalWithTax || 0}
+							customerId={appState.customer?.id}
+						/>
+					)}
 				</div>
 			))}
 		</div>
