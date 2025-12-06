@@ -48,7 +48,10 @@ export default component$<JuspayPaymentProps>(
 		useVisibleTask$(async () => {
 			try {
 				const methods = await getJuspayPaymentMethods(customerId);
-				if (methods?.payment_methods) {
+				// Handle both array and object with payment_methods property
+				if (Array.isArray(methods)) {
+					paymentMethods.value = methods.filter((m: PaymentMethod) => m.enabled);
+				} else if (methods?.payment_methods) {
 					paymentMethods.value = methods.payment_methods.filter((m: PaymentMethod) => m.enabled);
 				}
 
