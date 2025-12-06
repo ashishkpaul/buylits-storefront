@@ -71,10 +71,18 @@ export const getJuspayPaymentMethods = async (customerId?: string) => {
 		const result = await shopSdk.GetJuspayPaymentMethods({
 			customerId: customerId || undefined,
 		});
-		return result.getJuspayPaymentMethods;
+		const methods = result.getJuspayPaymentMethods;
+		// Ensure we return payment_methods array, handle both direct array and nested structure
+		if (Array.isArray(methods)) {
+			return methods;
+		}
+		if (methods && Array.isArray(methods.payment_methods)) {
+			return methods.payment_methods;
+		}
+		return [];
 	} catch (error) {
 		console.error('Failed to get payment methods:', error);
-		return { payment_methods: [] };
+		return [];
 	}
 };
 
