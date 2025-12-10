@@ -5,6 +5,14 @@ import {
 	getJuspayStoredCards,
 	verifyVpa,
 } from '~/providers/shop/payments/juspay';
+import { ErrorAction, ErrorCategory, JuspayErrorDetails } from '~/types/juspay-errors';
+import {
+	createErrorSummary,
+	getActionButtonText,
+	getProgressiveErrorMessage,
+	parseJuspayError,
+	shouldAutoRetry,
+} from '~/utils/juspay-errors';
 
 interface PaymentMethod {
 	payment_method_type: string;
@@ -35,14 +43,21 @@ export default component$<JuspayPaymentProps>(
 			upiId: '',
 			upiVerified: false,
 			isProcessing: false,
-			error: '',
+			error: null as JuspayErrorDetails | null,
 			showSavedCards: false,
+			failureCount: 0,
+			showAlternatives: false,
 		});
 
 		const paymentMethods = useSignal<PaymentMethod[]>([]);
 		const savedCards = useSignal<StoredCard[]>([]);
 		const isLoadingMethods = useSignal(true);
 		const isVerifyingVpa = useSignal(false);
+
+		// Retry tracker as serializable store (Qwik requires plain objects, not class instances)
+		const retryTracker = useSignal<Record<string, { attempts: number; lastAttemptTime: number }>>(
+			{}
+		);
 
 		// Load payment methods and saved cards
 		useVisibleTask$(async () => {
@@ -63,8 +78,9 @@ export default component$<JuspayPaymentProps>(
 					}
 				}
 			} catch (error) {
-				console.error('Failed to load payment methods:', error);
-				state.error = 'Failed to load payment methods. Please try again.';
+				const errorDetails = parseJuspayError(error);
+				console.error('Failed to load payment methods:', errorDetails);
+				state.error = errorDetails;
 			} finally {
 				isLoadingMethods.value = false;
 			}
@@ -72,26 +88,43 @@ export default component$<JuspayPaymentProps>(
 
 		const handleVpaVerification = $(async () => {
 			if (!state.upiId || !state.upiId.includes('@')) {
-				state.error = 'Please enter a valid UPI ID (format: username@bank)';
+				const validationError: JuspayErrorDetails = {
+					errorCode: 'INVALID_VPA',
+					errorCategory: ErrorCategory.USER_ERROR,
+					errorMessage: 'Invalid UPI ID format',
+					userMessage: 'Please enter a valid UPI ID (format: username@bank)',
+					suggestedAction: ErrorAction.RE_ENTER_DETAILS,
+					retryable: true,
+				};
+				state.error = validationError;
 				return;
 			}
 
 			isVerifyingVpa.value = true;
-			state.error = '';
+			state.error = null;
 
 			try {
 				const result = await verifyVpa(state.upiId);
 
 				if (result?.status === 'VALID') {
 					state.upiVerified = true;
-					state.error = '';
+					state.error = null;
 				} else {
 					state.upiVerified = false;
-					state.error = 'Invalid UPI ID. Please check and try again.';
+					const invalidVpaError: JuspayErrorDetails = {
+						errorCode: 'INVALID_VPA',
+						errorCategory: ErrorCategory.USER_ERROR,
+						errorMessage: 'VPA verification failed',
+						userMessage: 'Invalid UPI ID. Please check and try again.',
+						suggestedAction: ErrorAction.RE_ENTER_DETAILS,
+						retryable: true,
+					};
+					state.error = invalidVpaError;
 				}
 			} catch (error) {
-				console.error('VPA verification error:', error);
-				state.error = 'Failed to verify UPI ID. Please try again.';
+				const errorDetails = parseJuspayError(error);
+				console.error('VPA verification error:', errorDetails);
+				state.error = errorDetails;
 				state.upiVerified = false;
 			} finally {
 				isVerifyingVpa.value = false;
@@ -100,23 +133,55 @@ export default component$<JuspayPaymentProps>(
 
 		const handlePayment = $(async () => {
 			state.isProcessing = true;
-			state.error = '';
+			state.error = null;
+
+			// Track retry attempt (using plain object store)
+			const tracker = retryTracker.value;
+			const current = tracker[orderCode] || { attempts: 0, lastAttemptTime: 0 };
+			const newCount = current.attempts + 1;
+			tracker[orderCode] = { attempts: newCount, lastAttemptTime: Date.now() };
+			const attemptCount = newCount;
+			state.failureCount = attemptCount;
 
 			try {
 				// Validation
 				if (!state.selectedMethod) {
-					throw new Error('Please select a payment method');
+					const validationError: JuspayErrorDetails = {
+						errorCode: 'INVALID_ORDER',
+						errorCategory: ErrorCategory.VALIDATION_ERROR,
+						errorMessage: 'No payment method selected',
+						userMessage: 'Please select a payment method',
+						suggestedAction: ErrorAction.RE_ENTER_DETAILS,
+						retryable: true,
+					};
+					throw validationError;
 				}
 
 				if (state.selectedMethod === 'UPI' && !state.upiVerified) {
-					throw new Error('Please verify your UPI ID');
+					const validationError: JuspayErrorDetails = {
+						errorCode: 'INVALID_VPA',
+						errorCategory: ErrorCategory.USER_ERROR,
+						errorMessage: 'UPI ID not verified',
+						userMessage: 'Please verify your UPI ID before proceeding',
+						suggestedAction: ErrorAction.RE_ENTER_DETAILS,
+						retryable: true,
+					};
+					throw validationError;
 				}
 
-				// Get payment link
+				// Get payment link with retry
 				const paymentLink = await getJuspayPaymentLink(orderCode);
 
 				if (!paymentLink) {
-					throw new Error('Failed to create payment link');
+					const linkError: JuspayErrorDetails = {
+						errorCode: 'GATEWAY_ERROR',
+						errorCategory: ErrorCategory.TECHNICAL_ERROR,
+						errorMessage: 'Payment link creation failed',
+						userMessage: 'Failed to create payment link. Please try again.',
+						suggestedAction: ErrorAction.RETRY,
+						retryable: true,
+					};
+					throw linkError;
 				}
 
 				// Store context for return handler
@@ -132,9 +197,34 @@ export default component$<JuspayPaymentProps>(
 				// Redirect to Juspay payment page
 				window.location.href = paymentLink;
 			} catch (error: any) {
-				console.error('Payment initiation error:', error);
-				state.error = error.message || 'Failed to initiate payment. Please try again.';
+				const errorDetails = error.errorCode
+					? (error as JuspayErrorDetails)
+					: parseJuspayError(error, attemptCount);
+
+				console.error('Payment initiation error:', errorDetails);
+
+				// Update error with progressive messaging
+				const progressiveMessage = getProgressiveErrorMessage(errorDetails, attemptCount);
+				state.error = {
+					...errorDetails,
+					userMessage: progressiveMessage,
+					retryCount: attemptCount,
+				};
+
 				state.isProcessing = false;
+
+				// Show alternatives after multiple failures (threshold of 3 attempts)
+				if (attemptCount >= 3) {
+					state.showAlternatives = true;
+				}
+
+				// Auto-retry for technical errors
+				if (shouldAutoRetry(errorDetails)) {
+					console.log('Auto-retrying payment after technical error...');
+					setTimeout(() => {
+						handlePayment();
+					}, 2000); // 2 second delay before auto-retry
+				}
 			}
 		});
 
@@ -143,13 +233,23 @@ export default component$<JuspayPaymentProps>(
 			state.selectedCard = null;
 			state.upiId = '';
 			state.upiVerified = false;
-			state.error = '';
+			state.error = null;
+			state.failureCount = 0;
+			state.showAlternatives = false;
+			// Reset retry tracker for this order
+			const tracker = retryTracker.value;
+			delete tracker[orderCode];
 		});
 
 		const selectCard = $((card: StoredCard) => {
 			state.selectedCard = card;
 			state.selectedMethod = 'CARD';
-			state.error = '';
+			state.error = null;
+			state.failureCount = 0;
+			state.showAlternatives = false;
+			// Reset retry tracker for this order
+			const tracker = retryTracker.value;
+			delete tracker[orderCode];
 		});
 
 		// Loading state
@@ -167,10 +267,106 @@ export default component$<JuspayPaymentProps>(
 			<div class="juspay-payment-container max-w-2xl mx-auto space-y-6">
 				<h2 class="text-2xl font-bold text-gray-900">Complete Your Payment</h2>
 
-				{/* Error Alert */}
+				{/* Enhanced Error Alert */}
 				{state.error && (
-					<div class="bg-red-50 border border-red-200 rounded-lg p-4">
-						<p class="text-red-800 text-sm font-medium">{state.error}</p>
+					<div
+						class={[
+							'border-2 rounded-lg p-4 space-y-3',
+							state.error.errorCategory === ErrorCategory.USER_ERROR
+								? 'bg-yellow-50 border-yellow-300'
+								: state.error.errorCategory === ErrorCategory.USER_DROPPED
+									? 'bg-blue-50 border-blue-300'
+									: 'bg-red-50 border-red-300',
+						]}
+					>
+						<div class="flex items-start">
+							<div class="flex-shrink-0">
+								<svg
+									class={[
+										'h-5 w-5',
+										state.error.errorCategory === ErrorCategory.USER_ERROR
+											? 'text-yellow-600'
+											: state.error.errorCategory === ErrorCategory.USER_DROPPED
+												? 'text-blue-600'
+												: 'text-red-600',
+									]}
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 20 20"
+									fill="currentColor"
+								>
+									<path
+										fill-rule="evenodd"
+										d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+							</div>
+							<div class="ml-3 flex-1">
+								<h3
+									class={[
+										'text-sm font-medium',
+										state.error.errorCategory === ErrorCategory.USER_ERROR
+											? 'text-yellow-800'
+											: state.error.errorCategory === ErrorCategory.USER_DROPPED
+												? 'text-blue-800'
+												: 'text-red-800',
+									]}
+								>
+									{createErrorSummary(state.error).title}
+								</h3>
+								<p
+									class={[
+										'mt-1 text-sm',
+										state.error.errorCategory === ErrorCategory.USER_ERROR
+											? 'text-yellow-700'
+											: state.error.errorCategory === ErrorCategory.USER_DROPPED
+												? 'text-blue-700'
+												: 'text-red-700',
+									]}
+								>
+									{state.error.userMessage}
+								</p>
+
+								{/* Retry count indicator */}
+								{state.failureCount > 1 && (
+									<p class="mt-1 text-xs text-gray-600">Attempt {state.failureCount} of 3</p>
+								)}
+
+								{/* Action buttons */}
+								<div class="mt-3 flex flex-wrap gap-2">
+									{state.error.retryable && (
+										<button
+											onClick$={() => {
+												const shouldRetry = state.error?.suggestedAction === ErrorAction.RETRY;
+												state.error = null;
+												if (shouldRetry) {
+													handlePayment();
+												}
+											}}
+											class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+										>
+											{getActionButtonText(state.error.suggestedAction)}
+										</button>
+									)}
+
+									{state.showAlternatives && (
+										<button
+											onClick$={() => {
+												state.error = null;
+												state.selectedMethod = '';
+												state.showAlternatives = false;
+												// Reset retry tracker for this order
+												const tracker = retryTracker.value;
+												delete tracker[orderCode];
+											}}
+											class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+										>
+											Try Another Payment Method
+										</button>
+									)}
+								</div>
+							</div>
+						</div>
 					</div>
 				)}
 

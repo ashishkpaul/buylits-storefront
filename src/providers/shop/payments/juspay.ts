@@ -1,5 +1,7 @@
 import gql from 'graphql-tag';
 import { shopSdk } from '~/graphql-wrapper';
+import { parseJuspayError, trackErrorAnalytics } from '~/utils/juspay-errors';
+import { retryPaymentOperation } from '~/utils/retry-logic';
 
 // GraphQL Query Definitions (for code generator)
 gql`
@@ -58,19 +60,23 @@ gql`
 // Provider functions using GraphQL SDK
 export const getJuspayPaymentLink = async (orderCode: string) => {
 	try {
-		const result = await shopSdk.GetJuspayPaymentLink({ orderCode });
+		const result = await retryPaymentOperation(() => shopSdk.GetJuspayPaymentLink({ orderCode }));
 		return result.getJuspayPaymentLink;
 	} catch (error) {
-		console.error('Failed to get Juspay payment link:', error);
-		throw error;
+		const errorDetails = parseJuspayError(error);
+		trackErrorAnalytics(errorDetails, { orderId: orderCode });
+		console.error('Failed to get Juspay payment link:', errorDetails);
+		throw errorDetails;
 	}
 };
 
 export const getJuspayPaymentMethods = async (customerId?: string) => {
 	try {
-		const result = await shopSdk.GetJuspayPaymentMethods({
-			customerId: customerId || undefined,
-		});
+		const result = await retryPaymentOperation(() =>
+			shopSdk.GetJuspayPaymentMethods({
+				customerId: customerId || undefined,
+			})
+		);
 		const methods = result.getJuspayPaymentMethods;
 		// Ensure we return payment_methods array, handle both direct array and nested structure
 		if (Array.isArray(methods)) {
@@ -81,47 +87,61 @@ export const getJuspayPaymentMethods = async (customerId?: string) => {
 		}
 		return [];
 	} catch (error) {
-		console.error('Failed to get payment methods:', error);
+		const errorDetails = parseJuspayError(error);
+		trackErrorAnalytics(errorDetails, { customerId });
+		console.error('Failed to get payment methods:', errorDetails);
+		// Return empty array for non-critical errors to allow fallback
 		return [];
 	}
 };
 
 export const verifyVpa = async (vpa: string) => {
 	try {
-		const result = await shopSdk.VerifyVpa({ vpa });
+		const result = await retryPaymentOperation(() => shopSdk.VerifyVpa({ vpa }));
 		return result.verifyVpa;
 	} catch (error) {
-		console.error('Failed to verify VPA:', error);
-		throw error;
+		const errorDetails = parseJuspayError(error);
+		trackErrorAnalytics(errorDetails, { paymentMethod: 'UPI' });
+		console.error('Failed to verify VPA:', errorDetails);
+		throw errorDetails;
 	}
 };
 
 export const getJuspayStoredCards = async (customerId: string) => {
 	try {
-		const result = await shopSdk.GetJuspayStoredCards({ customerId });
+		const result = await retryPaymentOperation(() => shopSdk.GetJuspayStoredCards({ customerId }));
 		return result.getJuspayStoredCards || [];
 	} catch (error) {
-		console.error('Failed to get stored cards:', error);
+		const errorDetails = parseJuspayError(error);
+		trackErrorAnalytics(errorDetails, { customerId });
+		console.error('Failed to get stored cards:', errorDetails);
+		// Return empty array for non-critical errors
 		return [];
 	}
 };
 
 export const deleteJuspayStoredCard = async (cardToken: string) => {
 	try {
-		const result = await shopSdk.DeleteJuspayStoredCard({ cardToken });
+		const result = await retryPaymentOperation(() => shopSdk.DeleteJuspayStoredCard({ cardToken }));
 		return result.deleteJuspayStoredCard;
 	} catch (error) {
-		console.error('Failed to delete card:', error);
-		throw error;
+		const errorDetails = parseJuspayError(error);
+		trackErrorAnalytics(errorDetails, { paymentMethod: 'CARD' });
+		console.error('Failed to delete card:', errorDetails);
+		throw errorDetails;
 	}
 };
 
 export const updateJuspayCardNickname = async (cardToken: string, nickname: string) => {
 	try {
-		const result = await shopSdk.UpdateJuspayCardNickname({ cardToken, nickname });
+		const result = await retryPaymentOperation(() =>
+			shopSdk.UpdateJuspayCardNickname({ cardToken, nickname })
+		);
 		return result.updateJuspayCardNickname;
 	} catch (error) {
-		console.error('Failed to update card nickname:', error);
-		throw error;
+		const errorDetails = parseJuspayError(error);
+		trackErrorAnalytics(errorDetails, { paymentMethod: 'CARD' });
+		console.error('Failed to update card nickname:', errorDetails);
+		throw errorDetails;
 	}
 };
